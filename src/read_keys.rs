@@ -115,18 +115,16 @@ impl KeyRecorder {
             for received in rx {
                 match received {
                     KeyRecorderBehavior::ReleaseKey(key) => {
-                        release_key_handler(&mut previous_key, key, &single_hotkeys, &key_writer);
+                        release_key_handler(&mut previous_key, key, &single_hotkeys, &key_writer)
                     }
-                    KeyRecorderBehavior::SendKey(key) => {
-                        send_key_handler(
-                            &mut previous_key,
-                            key,
-                            &pair_hotkeys,
-                            &key_writer,
-                            &all_input_keys,
-                            &tx_clone,
-                        );
-                    }
+                    KeyRecorderBehavior::SendKey(key) => send_key_handler(
+                        &mut previous_key,
+                        key,
+                        &pair_hotkeys,
+                        &key_writer,
+                        &all_input_keys,
+                        &tx_clone,
+                    ),
                 }
             }
         });
