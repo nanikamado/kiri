@@ -55,7 +55,7 @@ impl KeyRecorder {
             .collect();
         thread::spawn(move || {
             let mut previous_key: Option<KeyEv> = None;
-            'read_event: for received in rx {
+            'event_loop: for received in rx {
                 match received {
                     KeyRecorderBehavior::ReleaseKey(key) => {
                         if Some(key) == previous_key {
@@ -66,7 +66,7 @@ impl KeyRecorder {
                                     for output_key in *output {
                                         key_writer.put_with_time(*output_key, &key.1);
                                     }
-                                    continue 'read_event;
+                                    continue 'event_loop;
                                 }
                             }
                         }
@@ -82,7 +82,7 @@ impl KeyRecorder {
                                     for output_key in *output {
                                         key_writer.put_with_time(*output_key, &key.1);
                                     }
-                                    continue 'read_event;
+                                            continue 'event_loop;
                                 }
                             }
                             set_previous_key(&mut previous_key, key, tx_clone.clone());
