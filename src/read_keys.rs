@@ -45,7 +45,6 @@ fn release_key_handler(
         *previous_key = None;
         for (input, output) in single_hotkeys {
             if key.0 == input[0] {
-                *previous_key = None;
                 for output_key in *output {
                     key_writer.put_with_time(*output_key, &key.1);
                 }
