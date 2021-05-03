@@ -31,6 +31,7 @@ fn reserve_release_key(key: (EV_KEY, TimeVal), tx: Sender<KeyRecorderBehavior>) 
         tx.send(KeyRecorderBehavior::ReleaseKey(key)).unwrap();
     });
 }
+
 pub struct KeyRecorder {
     tx: Sender<KeyRecorderBehavior>,
 }
