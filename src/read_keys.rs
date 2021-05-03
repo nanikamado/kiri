@@ -38,7 +38,7 @@ pub struct KeyRecorder {
 fn release_key_handler(
     previous_key: &mut Option<(EV_KEY, TimeVal)>,
     key: (EV_KEY, TimeVal),
-    single_hotkeys: &Vec<(&[EV_KEY], &[EV_KEY])>,
+    single_hotkeys: &[(&[EV_KEY], &[EV_KEY])],
     key_writer: &write_keys::KeyWriter,
 ) {
     if Some(key) == *previous_key {
@@ -57,7 +57,7 @@ fn release_key_handler(
 fn send_key_handler(
     previous_key: &mut Option<(EV_KEY, TimeVal)>,
     key: (EV_KEY, TimeVal),
-    pair_hotkeys: &Vec<(&[EV_KEY], &[EV_KEY])>,
+    pair_hotkeys: &[(&[EV_KEY], &[EV_KEY])],
     key_writer: &write_keys::KeyWriter,
     all_input_keys: &HashSet<EV_KEY>,
     tx: &Sender<KeyRecorderBehavior>,
