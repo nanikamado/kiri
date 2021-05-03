@@ -25,12 +25,7 @@ static KEY_SETTINGS: &[(&[EV_KEY], &[EV_KEY])] = &[
     (&[KEY_0], &[KEY_HENKAN]),
 ];
 
-fn set_previous_key(
-    previous_key: &mut Option<(EV_KEY, TimeVal)>,
-    key: (EV_KEY, TimeVal),
-    tx: Sender<KeyRecorderBehavior>,
-) {
-    *previous_key = Some(key);
+fn reserve_release_key(key: (EV_KEY, TimeVal), tx: Sender<KeyRecorderBehavior>) {
     thread::spawn(move || {
         thread::sleep(time::Duration::from_millis(50));
         tx.send(KeyRecorderBehavior::ReleaseKey(key)).unwrap();
@@ -55,6 +50,11 @@ impl KeyRecorder {
             .filter(|(input, _)| input.len() == 1)
             .copied()
             .collect();
+        let all_input_keys: HashSet<EV_KEY> = KEY_SETTINGS
+            .iter()
+            .flat_map(|(i, _)| i.iter())
+            .copied()
+            .collect();
         thread::spawn(move || {
             let mut previous_key: Option<KeyEv> = None;
             'event_loop: for received in rx {
@@ -73,26 +73,36 @@ impl KeyRecorder {
                             }
                         }
                     }
-                    KeyRecorderBehavior::SendKey(key) => match previous_key {
-                        Some((previous_ev_key, _)) => {
-                            let key_set = [previous_ev_key, key.0];
-                            let key_set = key_set.iter().collect::<HashSet<&enums::EV_KEY>>();
-                            for (input, output) in &pair_hotkeys {
-                                let candidate = input.iter().collect::<HashSet<&enums::EV_KEY>>();
-                                if key_set == candidate {
-                                    previous_key = None;
-                                    for output_key in *output {
-                                        key_writer.put_with_time(*output_key, &key.1);
-                                    }
+                    KeyRecorderBehavior::SendKey(key) => {
+                        if all_input_keys.contains(&key.0) {
+                            match previous_key {
+                                Some((previous_ev_key, _)) => {
+                                    let key_set = [previous_ev_key, key.0];
+                                    let key_set =
+                                        key_set.iter().collect::<HashSet<&enums::EV_KEY>>();
+                                    for (input, output) in &pair_hotkeys {
+                                        let candidate =
+                                            input.iter().collect::<HashSet<&enums::EV_KEY>>();
+                                        if key_set == candidate {
+                                            previous_key = None;
+                                            for output_key in *output {
+                                                key_writer.put_with_time(*output_key, &key.1);
+                                            }
                                             continue 'event_loop;
+                                        }
+                                    }
+                                    previous_key = Some(key);
+                                    reserve_release_key(key, tx_clone.clone());
+                                }
+                                _ => {
+                                    previous_key = Some(key);
+                                    reserve_release_key(key, tx_clone.clone());
                                 }
                             }
-                            set_previous_key(&mut previous_key, key, tx_clone.clone());
+                        } else {
+                            key_writer.put_with_time(key.0, &key.1);
                         }
-                        _ => {
-                            set_previous_key(&mut previous_key, key, tx_clone.clone());
-                        }
-                    },
+                    }
                 }
             }
         });
