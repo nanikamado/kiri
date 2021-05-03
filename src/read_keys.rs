@@ -63,7 +63,6 @@ impl KeyRecorder {
                             for (input, output) in &single_hotkeys {
                                 if key.0 == input[0] {
                                     previous_key = None;
-                                    println!("single !!!!!!!!");
                                     for output_key in *output {
                                         key_writer.put_with_time(*output_key, &key.1);
                                     }
@@ -80,7 +79,6 @@ impl KeyRecorder {
                                 let candidate = input.iter().collect::<HashSet<&enums::EV_KEY>>();
                                 if key_set == candidate {
                                     previous_key = None;
-                                    println!("as !!!!!!!!!!!!!!");
                                     for output_key in *output {
                                         key_writer.put_with_time(*output_key, &key.1);
                                     }
