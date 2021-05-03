@@ -21,6 +21,8 @@ static KEY_SETTINGS: &[(&[EV_KEY], &[EV_KEY])] = &[
     (&[KEY_G], &[KEY_L, KEY_T, KEY_U]),
     (&[KEY_S], &[KEY_T, KEY_O]),
     (&[KEY_S, KEY_L], &[KEY_S, KEY_A]),
+    (&[KEY_9], &[KEY_MUHENKAN]),
+    (&[KEY_0], &[KEY_HENKAN]),
 ];
 
 fn set_previous_key(
