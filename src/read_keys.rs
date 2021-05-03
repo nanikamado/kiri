@@ -35,6 +35,62 @@ pub struct KeyRecorder {
     tx: Sender<KeyRecorderBehavior>,
 }
 
+fn release_key_handler(
+    previous_key: &mut Option<(EV_KEY, TimeVal)>,
+    key: (EV_KEY, TimeVal),
+    single_hotkeys: &Vec<(&[EV_KEY], &[EV_KEY])>,
+    key_writer: &write_keys::KeyWriter,
+) {
+    if Some(key) == *previous_key {
+        *previous_key = None;
+        for (input, output) in single_hotkeys {
+            if key.0 == input[0] {
+                *previous_key = None;
+                for output_key in *output {
+                    key_writer.put_with_time(*output_key, &key.1);
+                }
+                return;
+            }
+        }
+    }
+}
+
+fn send_key_handler(
+    previous_key: &mut Option<(EV_KEY, TimeVal)>,
+    key: (EV_KEY, TimeVal),
+    pair_hotkeys: &Vec<(&[EV_KEY], &[EV_KEY])>,
+    key_writer: &write_keys::KeyWriter,
+    all_input_keys: &HashSet<EV_KEY>,
+    tx: &Sender<KeyRecorderBehavior>,
+) {
+    if all_input_keys.contains(&key.0) {
+        match previous_key {
+            Some((previous_ev_key, _)) => {
+                let key_set = [*previous_ev_key, key.0];
+                let key_set = key_set.iter().collect::<HashSet<&enums::EV_KEY>>();
+                for (input, output) in pair_hotkeys {
+                    let candidate = input.iter().collect::<HashSet<&enums::EV_KEY>>();
+                    if key_set == candidate {
+                        *previous_key = None;
+                        for output_key in *output {
+                            key_writer.put_with_time(*output_key, &key.1);
+                        }
+                        return;
+                    }
+                }
+                *previous_key = Some(key);
+                reserve_release_key(key, tx.clone());
+            }
+            _ => {
+                *previous_key = Some(key);
+                reserve_release_key(key, tx.clone());
+            }
+        }
+    } else {
+        key_writer.put_with_time(key.0, &key.1);
+    }
+}
+
 impl KeyRecorder {
     pub fn new(d: &Device) -> KeyRecorder {
         let (tx, rx) = channel();
@@ -57,51 +113,20 @@ impl KeyRecorder {
             .collect();
         thread::spawn(move || {
             let mut previous_key: Option<KeyEv> = None;
-            'event_loop: for received in rx {
+            for received in rx {
                 match received {
                     KeyRecorderBehavior::ReleaseKey(key) => {
-                        if Some(key) == previous_key {
-                            previous_key = None;
-                            for (input, output) in &single_hotkeys {
-                                if key.0 == input[0] {
-                                    previous_key = None;
-                                    for output_key in *output {
-                                        key_writer.put_with_time(*output_key, &key.1);
-                                    }
-                                    continue 'event_loop;
-                                }
-                            }
-                        }
+                        release_key_handler(&mut previous_key, key, &single_hotkeys, &key_writer);
                     }
                     KeyRecorderBehavior::SendKey(key) => {
-                        if all_input_keys.contains(&key.0) {
-                            match previous_key {
-                                Some((previous_ev_key, _)) => {
-                                    let key_set = [previous_ev_key, key.0];
-                                    let key_set =
-                                        key_set.iter().collect::<HashSet<&enums::EV_KEY>>();
-                                    for (input, output) in &pair_hotkeys {
-                                        let candidate =
-                                            input.iter().collect::<HashSet<&enums::EV_KEY>>();
-                                        if key_set == candidate {
-                                            previous_key = None;
-                                            for output_key in *output {
-                                                key_writer.put_with_time(*output_key, &key.1);
-                                            }
-                                            continue 'event_loop;
-                                        }
-                                    }
-                                    previous_key = Some(key);
-                                    reserve_release_key(key, tx_clone.clone());
-                                }
-                                _ => {
-                                    previous_key = Some(key);
-                                    reserve_release_key(key, tx_clone.clone());
-                                }
-                            }
-                        } else {
-                            key_writer.put_with_time(key.0, &key.1);
-                        }
+                        send_key_handler(
+                            &mut previous_key,
+                            key,
+                            &pair_hotkeys,
+                            &key_writer,
+                            &all_input_keys,
+                            &tx_clone,
+                        );
                     }
                 }
             }
