@@ -1,5 +1,5 @@
 [package]
-name = "getamap"
+name = "kiri"
 version = "0.1.0"
 authors = ["nanikamado <nanikamado@gmail.com>"]
 edition = "2018"
