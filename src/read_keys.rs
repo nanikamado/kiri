@@ -30,11 +30,27 @@ fn handle_ev_key_output(
     outputs: &Vec<EvKeyOutput>,
     time: &TimeVal,
     key_writer: &write_keys::KeyWriter,
+    flags: &mut HashSet<String>,
+    condition: &Vec<read_config::Flag>,
 ) {
+    dbg!(&flags, condition);
     for output in outputs {
         match output {
-            EvKeyOutput::Tap(output_key) => key_writer.put_with_time(*output_key, time),
-            EvKeyOutput::Toggle(_) => {}
+            EvKeyOutput::Tap(output_key) => {
+                if condition.iter().all(|f| match f {
+                    read_config::Flag::Is(f) => flags.contains(f),
+                    read_config::Flag::Not(f) => !flags.contains(f),
+                }) {
+                    key_writer.put_with_time(*output_key, time)
+                }
+            }
+            EvKeyOutput::Toggle(f) => {
+                if flags.contains(f) {
+                    flags.remove(f);
+                } else {
+                    flags.insert(f.to_string());
+                }
+            }
         }
     }
 }
@@ -44,18 +60,18 @@ fn release_key_handler(
     key: (EV_KEY, TimeVal),
     single_hotkeys: &Vec<EvHotKey>,
     key_writer: &write_keys::KeyWriter,
+    flags: &mut HashSet<String>,
 ) {
     if Some(key) == *previous_key {
         *previous_key = None;
         for EvHotKey {
             input,
             output,
-            condition: _,
+            condition,
         } in single_hotkeys
         {
             if key.0 == *input.iter().next().unwrap() {
-                handle_ev_key_output(output, &key.1, key_writer);
-                return;
+                handle_ev_key_output(output, &key.1, key_writer, flags, condition);
             }
         }
     }
@@ -68,25 +84,27 @@ fn send_key_handler(
     key_writer: &write_keys::KeyWriter,
     all_input_keys: &HashSet<EV_KEY>,
     tx: &Sender<KeyRecorderBehavior>,
+    flags: &mut HashSet<String>,
 ) {
     if all_input_keys.contains(&key.0) {
+        dbg!(&key, &previous_key);
         match previous_key {
             Some((previous_ev_key, _)) => {
                 let key_set = [*previous_ev_key, key.0];
-                let key_set = key_set.iter().collect::<HashSet<&enums::EV_KEY>>();
+                let key_set = key_set.iter().copied().collect::<HashSet<enums::EV_KEY>>();
                 for EvHotKey {
                     input,
                     output,
-                    condition: _,
+                    condition,
                 } in pair_hotkeys
                 {
-                    let candidate = input.iter().collect::<HashSet<&enums::EV_KEY>>();
-                    if key_set == candidate {
+                    if key_set == *input {
                         *previous_key = None;
-                        handle_ev_key_output(output, &key.1, key_writer);
+                        handle_ev_key_output(output, &key.1, key_writer, flags, condition);
                         return;
                     }
                 }
+                dbg!(&key);
                 *previous_key = Some(key);
                 reserve_release_key(key, tx.clone());
             }
@@ -123,6 +141,7 @@ fn key_name_convert(name: &str) -> EV_KEY {
         "/" => "SLASH",
         "-" => "MINUS",
         "@" => "LEFTBRACE",
+        "zenkakuhankaku" => "GRAVE",
         n => n,
     };
     format!("KEY_{}", name.to_uppercase())
@@ -176,11 +195,16 @@ impl KeyRecorder {
             .collect();
         thread::spawn(move || {
             let mut previous_key: Option<KeyEv> = None;
+            let mut flags: HashSet<String> = HashSet::new();
             for received in rx {
                 match received {
-                    KeyRecorderBehavior::ReleaseKey(key) => {
-                        release_key_handler(&mut previous_key, key, &single_hotkeys, &key_writer)
-                    }
+                    KeyRecorderBehavior::ReleaseKey(key) => release_key_handler(
+                        &mut previous_key,
+                        key,
+                        &single_hotkeys,
+                        &key_writer,
+                        &mut flags,
+                    ),
                     KeyRecorderBehavior::SendKey(key) => send_key_handler(
                         &mut previous_key,
                         key,
@@ -188,6 +212,7 @@ impl KeyRecorder {
                         &key_writer,
                         &all_input_keys,
                         &tx_clone,
+                        &mut flags,
                     ),
                 }
             }
