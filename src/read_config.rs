@@ -83,10 +83,7 @@ fn read_config_(
                         {
                             context.output = vec![KeyOutput::Toggle(flag_name.to_string())];
                         } else {
-                            context.output = output
-                                .chars()
-                                .map(|c| KeyOutput::Tap(c.to_string()))
-                                .collect();
+                            context.output = vec![KeyOutput::Tap(output.clone())];
                         }
                         hotkeys.push(context);
                     }
