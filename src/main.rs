@@ -5,6 +5,7 @@ mod print_info;
 mod read_events;
 mod read_keys;
 mod write_keys;
+mod read_config;
 
 fn usage() {
     println!("Usage: evtest /path/to/device");

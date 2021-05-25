@@ -1,11 +1,10 @@
-use evdev_rs::enums::EV_KEY::{self, *};
+use evdev_rs::enums::EV_KEY;
 use evdev_rs::*;
 use std::collections::HashSet;
-use std::{
-    sync::mpsc::{channel, Sender},
-    thread, time,
-};
+use std::sync::mpsc::{channel, Sender};
+use std::{thread, time};
 
+use crate::read_config;
 use crate::write_keys;
 
 type KeyEv = (enums::EV_KEY, TimeVal);
@@ -15,15 +14,6 @@ enum KeyRecorderBehavior {
     ReleaseKey(KeyEv),
     SendKey(KeyEv),
 }
-
-static KEY_SETTINGS: &[(&[EV_KEY], &[EV_KEY])] = &[
-    (&[KEY_G, KEY_I], &[KEY_C, KEY_H, KEY_O]),
-    (&[KEY_G], &[KEY_L, KEY_T, KEY_U]),
-    (&[KEY_S], &[KEY_T, KEY_O]),
-    (&[KEY_S, KEY_L], &[KEY_S, KEY_A]),
-    (&[KEY_9], &[KEY_MUHENKAN]),
-    (&[KEY_0], &[KEY_HENKAN]),
-];
 
 fn reserve_release_key(key: (EV_KEY, TimeVal), tx: Sender<KeyRecorderBehavior>) {
     thread::spawn(move || {
@@ -36,19 +26,35 @@ pub struct KeyRecorder {
     tx: Sender<KeyRecorderBehavior>,
 }
 
+fn handle_ev_key_output(
+    outputs: &Vec<EvKeyOutput>,
+    time: &TimeVal,
+    key_writer: &write_keys::KeyWriter,
+) {
+    for output in outputs {
+        match output {
+            EvKeyOutput::Tap(output_key) => key_writer.put_with_time(*output_key, time),
+            EvKeyOutput::Toggle(_) => {}
+        }
+    }
+}
+
 fn release_key_handler(
     previous_key: &mut Option<(EV_KEY, TimeVal)>,
     key: (EV_KEY, TimeVal),
-    single_hotkeys: &[(&[EV_KEY], &[EV_KEY])],
+    single_hotkeys: &Vec<EvHotKey>,
     key_writer: &write_keys::KeyWriter,
 ) {
     if Some(key) == *previous_key {
         *previous_key = None;
-        for (input, output) in single_hotkeys {
-            if key.0 == input[0] {
-                for output_key in *output {
-                    key_writer.put_with_time(*output_key, &key.1);
-                }
+        for EvHotKey {
+            input,
+            output,
+            condition: _,
+        } in single_hotkeys
+        {
+            if key.0 == *input.iter().next().unwrap() {
+                handle_ev_key_output(output, &key.1, key_writer);
                 return;
             }
         }
@@ -58,7 +64,7 @@ fn release_key_handler(
 fn send_key_handler(
     previous_key: &mut Option<(EV_KEY, TimeVal)>,
     key: (EV_KEY, TimeVal),
-    pair_hotkeys: &[(&[EV_KEY], &[EV_KEY])],
+    pair_hotkeys: &Vec<EvHotKey>,
     key_writer: &write_keys::KeyWriter,
     all_input_keys: &HashSet<EV_KEY>,
     tx: &Sender<KeyRecorderBehavior>,
@@ -68,13 +74,16 @@ fn send_key_handler(
             Some((previous_ev_key, _)) => {
                 let key_set = [*previous_ev_key, key.0];
                 let key_set = key_set.iter().collect::<HashSet<&enums::EV_KEY>>();
-                for (input, output) in pair_hotkeys {
+                for EvHotKey {
+                    input,
+                    output,
+                    condition: _,
+                } in pair_hotkeys
+                {
                     let candidate = input.iter().collect::<HashSet<&enums::EV_KEY>>();
                     if key_set == candidate {
                         *previous_key = None;
-                        for output_key in *output {
-                            key_writer.put_with_time(*output_key, &key.1);
-                        }
+                        handle_ev_key_output(output, &key.1, key_writer);
                         return;
                     }
                 }
@@ -91,25 +100,79 @@ fn send_key_handler(
     }
 }
 
+#[derive(Debug, Clone)]
+enum EvKeyOutput {
+    Tap(EV_KEY),
+    // Down(String),
+    // Up(String),
+    Toggle(String),
+}
+
+#[derive(Debug, Clone)]
+pub struct EvHotKey {
+    input: HashSet<EV_KEY>,
+    output: Vec<EvKeyOutput>,
+    condition: read_config::Flags,
+}
+
+fn key_name_convert(name: &str) -> EV_KEY {
+    let name = match name {
+        ";" => "SEMICOLON",
+        "," => "COMMA",
+        "." => "DOT",
+        "/" => "SLASH",
+        "-" => "MINUS",
+        "@" => "LEFTBRACE",
+        n => n,
+    };
+    format!("KEY_{}", name.to_uppercase())
+        .parse()
+        .unwrap_or_else(|_| {
+            println!("cannot parse: {}", name);
+            EV_KEY::KEY_1
+        })
+}
+
+fn setup_config() -> Result<Vec<EvHotKey>, Box<dyn std::error::Error>> {
+    read_config::run()
+        .unwrap()
+        .into_iter()
+        .map(|hk| {
+            Ok(EvHotKey {
+                input: hk.input.into_iter().map(|f| key_name_convert(&f)).collect(),
+                output: hk
+                    .output
+                    .into_iter()
+                    .map(|f| match f {
+                        read_config::KeyOutput::Tap(s) => EvKeyOutput::Tap(key_name_convert(&s)),
+                        read_config::KeyOutput::Toggle(f) => EvKeyOutput::Toggle(f.to_string()),
+                    })
+                    .collect(),
+                condition: hk.condition,
+            })
+        })
+        .collect()
+}
+
 impl KeyRecorder {
     pub fn new(d: &Device) -> KeyRecorder {
+        let config = setup_config().unwrap();
+        let single_hotkeys: Vec<EvHotKey> = config
+            .iter()
+            .filter(|ev_hotkey| ev_hotkey.input.len() == 1)
+            .cloned()
+            .collect();
+        let pair_hotkeys: Vec<EvHotKey> = config
+            .iter()
+            .filter(|ev_hotkey| ev_hotkey.input.len() == 2)
+            .cloned()
+            .collect();
         let (tx, rx) = channel();
         let tx_clone = tx.clone();
         let key_writer = write_keys::KeyWriter::new(d);
-        let pair_hotkeys: Vec<(&[EV_KEY], &[EV_KEY])> = KEY_SETTINGS
-            .iter()
-            .filter(|(input, _)| input.len() == 2)
-            .copied()
-            .collect();
-        let single_hotkeys: Vec<(&[EV_KEY], &[EV_KEY])> = KEY_SETTINGS
-            .iter()
-            .filter(|(input, _)| input.len() == 1)
-            .copied()
-            .collect();
-        let all_input_keys: HashSet<EV_KEY> = KEY_SETTINGS
-            .iter()
-            .flat_map(|(i, _)| i.iter())
-            .copied()
+        let all_input_keys: HashSet<EV_KEY> = config
+            .into_iter()
+            .flat_map(|k| k.input.into_iter())
             .collect();
         thread::spawn(move || {
             let mut previous_key: Option<KeyEv> = None;
