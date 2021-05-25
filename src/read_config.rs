@@ -4,8 +4,13 @@ use regex::Regex;
 use std::collections::HashSet;
 
 #[allow(clippy::single_match)]
+#[derive(Debug, Clone)]
+pub enum Flag {
+    Is(String),
+    Not(String),
+}
 
-pub type Flags = Vec<String>;
+pub type Flags = Vec<Flag>;
 
 #[derive(Debug, Clone)]
 pub enum KeyOutput {
@@ -25,6 +30,7 @@ pub struct HotKey {
 }
 
 static IF_PATTERN: Lazy<regex::Regex> = Lazy::new(|| Regex::new(r"^if\((.+)\)$").unwrap());
+static IF_NOT_PATTERN: Lazy<regex::Regex> = Lazy::new(|| Regex::new(r"^if-not\((.+)\)$").unwrap());
 static TOGGLE_PATTERN: Lazy<regex::Regex> = Lazy::new(|| Regex::new(r"^toggle\((.+)\)$").unwrap());
 
 fn read_config_(
@@ -39,7 +45,14 @@ fn read_config_(
             .map(|caps| caps.get(1).unwrap().as_str())
         {
             let mut context = context.clone();
-            context.condition.push(flag_name.to_string());
+            context.condition.push(Flag::Is(flag_name.to_string()));
+            hotkeys = read_config_(hotkeys, c.1.as_table().unwrap(), context, packed);
+        } else if let Some(flag_name) = IF_NOT_PATTERN
+            .captures(c.0)
+            .map(|caps| caps.get(1).unwrap().as_str())
+        {
+            let mut context = context.clone();
+            context.condition.push(Flag::Not(flag_name.to_string()));
             hotkeys = read_config_(hotkeys, c.1.as_table().unwrap(), context, packed);
         } else if c.0 == "packed()" {
             hotkeys = read_config_(hotkeys, c.1.as_table().unwrap(), context.clone(), true);
