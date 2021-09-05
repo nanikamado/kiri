@@ -175,6 +175,11 @@ fn setup_config() -> Result<Vec<EvHotKey>, Box<dyn std::error::Error>> {
 
 impl KeyRecorder {
     pub fn new(d: &Device) -> KeyRecorder {
+        let new_single_hotkeys: &[EvHotKey] = &[EvHotKey {
+            input: [].iter().copied().collect::<HashSet<_>>(),
+            output: vec![],
+            condition: vec![],
+        }];
         let config = setup_config().unwrap();
         let single_hotkeys: Vec<EvHotKey> = config
             .iter()
@@ -193,6 +198,7 @@ impl KeyRecorder {
             .into_iter()
             .flat_map(|k| k.input.into_iter())
             .collect();
+        println!("{:?}", &single_hotkeys);
         thread::spawn(move || {
             let mut previous_key: Option<KeyEv> = None;
             let mut flags: HashSet<String> = HashSet::new();

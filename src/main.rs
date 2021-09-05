@@ -20,9 +20,9 @@ fn main() {
     let path = &args.nth(1).unwrap();
     let f = File::open(path).unwrap();
     let u_d = UninitDevice::new().unwrap();
-    let mut d = u_d.set_file(f).unwrap();
+    let mut device = u_d.set_file(f).unwrap();
     thread::sleep(std::time::Duration::from_secs(1));
-    print_info::print_info(&d);
-    d.grab(GrabMode::Grab).unwrap();
-    read_events::run(d);
+    print_info::print_info(&device);
+    device.grab(GrabMode::Grab).unwrap();
+    read_events::run(device);
 }
