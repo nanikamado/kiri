@@ -42,7 +42,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "getamap"
+name = "kiri"
 version = "0.1.0"
 dependencies = [
  "evdev-rs",

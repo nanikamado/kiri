@@ -1,0 +1,61 @@
+# 新下駄配列
+# http://kouy.exblog.jp/13627994/
+
+zenkakuhankaku = "toggle(flag-1)"
+henkan         = "enter"
+muhenkan       = "backspace"
+
+["if(flag-1)"]
+zenkakuhankaku = "muhenkan"
+
+["if-not(flag-1)"]
+zenkakuhankaku = "henkan"
+
+["if(flag-1)"."packed()"]
+qwert = ["-",  "ni", "ha", ",",  "chi"]
+asdfg = ["no", "to", "ka", "nn", "ltu"]
+zxcvb = ["su", "ma", "ki", "ru", "tu"]
+
+"yuiop@" = ["gu", "ba", "ko", "ga",  "hi", "ge"]
+"hjkl;"  = ["ku", "u",  "i",  "shi", "na"]
+"nm,./"  = ["te", "ta", "de", ".",   "bu"]
+
+["if(flag-1)".k."packed()"]
+12345 = ["la", "li", "lu", "le", "lo"]
+qwert = ["fa", "go", "fu", "fi", "fe"]
+asdfg = ["ho", "ji", "re", "mo", "yu"]
+zxcvb = ["du", "zo", "bo", "mu", "fo"]
+
+["if(flag-1)".l."packed()"]
+12345 = ["lya", "mya", "myu", "myo",  "wa"]
+qwert = ["di",  "me",  "ke",  "teli", "deli"]
+asdfg = ["wo",  "sa",  "o",   "ri",   "zu"]
+zxcvb = ["ze",  "za",  "gi",  "ro",   "nu"]
+
+["if(flag-1)".s."packed()"]
+"yuiop@" = ["sye", "pe", "do", "ya",  "sye"]
+"hjkl;"  = ["bi",  "ra", "",   "",    "so"]
+"nm,./"  = ["wa",  "da", "pe", "po",   "tye"]
+
+["if(flag-1)".d."packed()"]
+"yuiop@" = ["wi", "pa", "pa", "yo", "mi", "we", "ulo"]
+"hjkl;"  = ["he", "a",  "",   "",   "e"]
+"nm,./"  = ["se", "ne", "be", "pu", "vu"]
+
+["if(flag-1)".i."packed()"]
+12345 = ["lyu", "bya", "byu", "byo"]
+qwert = ["hyu", "syu", "syo", "kyu", "chu"]
+asdfg = ["hyo", "",    "",    "kyo", "cho"]
+zxcvb = ["hya", "",    "sha", "kya", "cha"]
+
+["if(flag-1)".o."packed()"]
+12345 = ["lyo", "pya", "pyu", "pyo"]
+qwert = ["ryu", "ju",  "jo",  "gyu", "nyu"]
+asdfg = ["ryo", "",    "",    "gyo", "nyo"]
+zxcvb = ["rya", "",    "ja",  "gya", "nya"]
+
+# ["if(flag-1)".f]
+# g = ["[", "]", "Enter", "Left"]
+
+# ["if(flag-1)".j]
+# k = ["down(Shift)", "8", "9", "up(Shift)", "Enter", "Left"]
