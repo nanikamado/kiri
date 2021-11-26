@@ -1,6 +1,6 @@
 use evdev_rs::enums::EV_KEY;
 use evdev_rs::*;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::{
     sync::mpsc::{channel, Sender},
     thread, time,
@@ -19,7 +19,7 @@ enum KeyRecorderBehavior {
 
 fn reserve_release_key(key: (EV_KEY, TimeVal), tx: Sender<KeyRecorderBehavior>) {
     thread::spawn(move || {
-        thread::sleep(time::Duration::from_millis(50));
+        thread::sleep(time::Duration::from_millis(1000));
         tx.send(KeyRecorderBehavior::ReleaseKey(key)).unwrap();
     });
 }
@@ -31,18 +31,17 @@ pub struct KeyRecorder {
 fn release_key_handler(
     previous_key: &mut Option<(EV_KEY, TimeVal)>,
     key: (EV_KEY, TimeVal),
-    single_hotkeys: &[(&[EV_KEY], &[EV_KEY])],
+    single_hotkeys: &HashMap<EV_KEY, &[EV_KEY]>,
     key_writer: &write_keys::KeyWriter,
 ) {
     if Some(key) == *previous_key {
         *previous_key = None;
-        for (input, output) in single_hotkeys {
-            if key.0 == input[0] {
-                for output_key in *output {
-                    key_writer.put_with_time(*output_key, &key.1);
-                }
-                return;
+        if let Some(os) = single_hotkeys.get(&key.0) {
+            for output_key in *os {
+                key_writer.put_with_time(*output_key, &key.1);
             }
+        } else {
+            key_writer.put_with_time(key.0, &key.1);
         }
     }
 }
@@ -52,10 +51,11 @@ fn send_key_handler(
     key: (EV_KEY, TimeVal),
     pair_hotkeys: &[(&[EV_KEY], &[EV_KEY])],
     key_writer: &write_keys::KeyWriter,
-    all_input_keys: &HashSet<EV_KEY>,
+    pair_input_keys: &HashSet<EV_KEY>,
+    single_hotkeys_map: &HashMap<EV_KEY, &[EV_KEY]>,
     tx: &Sender<KeyRecorderBehavior>,
 ) {
-    if all_input_keys.contains(&key.0) {
+    if pair_input_keys.contains(&key.0) {
         match previous_key {
             Some((previous_ev_key, _)) => {
                 let key_set = [*previous_ev_key, key.0];
@@ -76,10 +76,14 @@ fn send_key_handler(
             _ => {
                 *previous_key = Some(key);
                 reserve_release_key(key, tx.clone());
+                dbg!("reserved");
             }
         }
     } else {
-        key_writer.put_with_time(key.0, &key.1);
+        let os = single_hotkeys_map[&key.0];
+        for o in os {
+            key_writer.put_with_time(*o, &key.1);
+        }
     }
 }
 
@@ -93,29 +97,34 @@ impl KeyRecorder {
             .filter(|(input, _)| input.len() == 2)
             .copied()
             .collect();
-        let single_hotkeys: Vec<(&[EV_KEY], &[EV_KEY])> = key_config
+        let single_hotkeys_map: HashMap<EV_KEY, &[EV_KEY]> = key_config
             .iter()
             .filter(|(input, _)| input.len() == 1)
-            .copied()
+            .map(|(i, o)| (i[0], *o))
             .collect();
-        let all_input_keys: HashSet<EV_KEY> = key_config
+        let pair_input_keys: HashSet<EV_KEY> = pair_hotkeys
             .iter()
             .flat_map(|(i, _)| i.iter())
             .copied()
             .collect();
+        dbg!(&pair_input_keys);
         thread::spawn(move || {
             let mut previous_key: Option<KeyEv> = None;
             for received in rx {
                 match received {
-                    KeyRecorderBehavior::ReleaseKey(key) => {
-                        release_key_handler(&mut previous_key, key, &single_hotkeys, &key_writer)
-                    }
+                    KeyRecorderBehavior::ReleaseKey(key) => release_key_handler(
+                        &mut previous_key,
+                        key,
+                        &single_hotkeys_map,
+                        &key_writer,
+                    ),
                     KeyRecorderBehavior::SendKey(key) => send_key_handler(
                         &mut previous_key,
                         key,
                         &pair_hotkeys,
                         &key_writer,
-                        &all_input_keys,
+                        &pair_input_keys,
+                        &single_hotkeys_map,
                         &tx_clone,
                     ),
                     KeyRecorderBehavior::EventWrite(e) => {
