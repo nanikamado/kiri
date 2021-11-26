@@ -113,7 +113,30 @@ fn read_config(config: &toml::value::Map<String, toml::Value>) -> Vec<HotKey> {
     )
 }
 
+enum KeyOutputSetting<'a> {
+    T(&'a str),
+    // Down(String),
+    // Up(String),
+    // Toggle(&'a str),
+}
+
 pub fn run() -> Result<Vec<HotKey>, Box<dyn std::error::Error>> {
+    use KeyOutputSetting::T;
+    let raw_config: &[(&[&str], &[KeyOutputSetting])] = &[
+        (&["henkan"], &[T("backspace")]),
+        (&["muhenkan"], &[T("enter")]),
+        (&["q"], &[T("-")]),
+        (&["w"], &[T("n"), T("i")]),
+        (&["e"], &[T("f"), T("u")]),
+        (&["k", "1"], &[T("l"), T("a")]),
+        (&["k", "q"], &[T("f"), T("a")]),
+        (&["k", "w"], &[T("g"), T("o")]),
+        (&["k", "e"], &[T("f"), T("u")]),
+        (&["l", "1"], &[T("l"), T("y"), T("a")]),
+        (&["l", "q"], &[T("d"), T("i")]),
+        (&["l", "w"], &[T("m"), T("e")]),
+        (&["l", "e"], &[T("k"), T("e")]),
+    ];
     let toml_string = std::fs::read_to_string("src/singeta.toml").expect("");
     let config: toml::Value = toml::from_str(&toml_string)?;
     let config = config.as_table().ok_or("config file is not a table")?;
