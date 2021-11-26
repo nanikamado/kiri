@@ -1,4 +1,4 @@
-use evdev_rs::{Device, InputEvent, TimeVal, UInputDevice, enums};
+use evdev_rs::{enums, Device, InputEvent, TimeVal, UInputDevice};
 
 pub struct KeyWriter {
     device: UInputDevice,
@@ -32,5 +32,15 @@ impl KeyWriter {
                 0,
             ))
             .unwrap();
+    }
+
+    pub fn write_event(&self, event: &InputEvent) -> Result<(), std::io::Error> {
+        self.device.write_event(event)?;
+        self.device
+            .write_event(&InputEvent::new(
+                &event.time,
+                &enums::EventCode::EV_SYN(enums::EV_SYN::SYN_REPORT),
+                0,
+            ))
     }
 }

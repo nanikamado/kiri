@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use evdev_rs::enums::EventCode;
 use evdev_rs::{Device, InputEvent, ReadFlag, ReadStatus};
 
@@ -29,8 +31,22 @@ fn print_sync_dropped_event(ev: &InputEvent) {
     print_event(ev);
 }
 
+use evdev_rs::enums::EV_KEY::{self, *};
+
+static KEY_SETTINGS: &[(&[EV_KEY], &[EV_KEY])] = &[
+    (&[KEY_G, KEY_I], &[KEY_C, KEY_H, KEY_O]),
+    (&[KEY_G], &[KEY_L, KEY_T, KEY_U]),
+    (&[KEY_S], &[KEY_T, KEY_O]),
+    (&[KEY_S, KEY_L], &[KEY_S, KEY_A]),
+    (&[KEY_9], &[KEY_MUHENKAN]),
+    (&[KEY_0], &[KEY_HENKAN]),
+    (&[KEY_HENKAN], &[KEY_ENTER]),
+    (&[KEY_MUHENKAN], &[KEY_BACKSPACE]),
+];
+
 pub fn run(d: Device) {
-    let key_recorder = KeyRecorder::new(&d);
+    let key_recorder = KeyRecorder::new(&d, KEY_SETTINGS);
+    let watching_keys: HashSet<_> = KEY_SETTINGS.iter().flat_map(|(i, _)| i.iter()).collect();
     loop {
         match d.next_event(ReadFlag::NORMAL | ReadFlag::BLOCKING) {
             Ok((ReadStatus::Success, e)) => {
@@ -38,14 +54,20 @@ pub fn run(d: Device) {
                 if let InputEvent {
                     event_code: EventCode::EV_KEY(key),
                     time,
-                    value: 1,
+                    value: input_event_velue,
                     ..
                 } = e
                 {
-                    if evdev_rs::enums::EV_KEY::KEY_ESC == key {
+                    if input_event_velue == 1 && evdev_rs::enums::EV_KEY::KEY_ESC == key {
                         break;
                     }
-                    key_recorder.send_key(key, time)
+                    if watching_keys.contains(&key) {
+                        if input_event_velue == 1 {
+                            key_recorder.send_key(key, time);
+                        }
+                    } else {
+                        key_recorder.event_write(e)
+                    }
                 }
             }
             Ok((ReadStatus::Sync, e)) => {

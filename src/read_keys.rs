@@ -1,4 +1,4 @@
-use evdev_rs::enums::EV_KEY::{self, *};
+use evdev_rs::enums::EV_KEY;
 use evdev_rs::*;
 use std::collections::HashSet;
 use std::{
@@ -14,16 +14,8 @@ type KeyEv = (enums::EV_KEY, TimeVal);
 enum KeyRecorderBehavior {
     ReleaseKey(KeyEv),
     SendKey(KeyEv),
+    EventWrite(InputEvent),
 }
-
-static KEY_SETTINGS: &[(&[EV_KEY], &[EV_KEY])] = &[
-    (&[KEY_G, KEY_I], &[KEY_C, KEY_H, KEY_O]),
-    (&[KEY_G], &[KEY_L, KEY_T, KEY_U]),
-    (&[KEY_S], &[KEY_T, KEY_O]),
-    (&[KEY_S, KEY_L], &[KEY_S, KEY_A]),
-    (&[KEY_9], &[KEY_MUHENKAN]),
-    (&[KEY_0], &[KEY_HENKAN]),
-];
 
 fn reserve_release_key(key: (EV_KEY, TimeVal), tx: Sender<KeyRecorderBehavior>) {
     thread::spawn(move || {
@@ -92,21 +84,21 @@ fn send_key_handler(
 }
 
 impl KeyRecorder {
-    pub fn new(d: &Device) -> KeyRecorder {
+    pub fn new(d: &Device, key_config: &'static [(&[EV_KEY], &[EV_KEY])]) -> KeyRecorder {
         let (tx, rx) = channel();
         let tx_clone = tx.clone();
         let key_writer = write_keys::KeyWriter::new(d);
-        let pair_hotkeys: Vec<(&[EV_KEY], &[EV_KEY])> = KEY_SETTINGS
+        let pair_hotkeys: Vec<(&[EV_KEY], &[EV_KEY])> = key_config
             .iter()
             .filter(|(input, _)| input.len() == 2)
             .copied()
             .collect();
-        let single_hotkeys: Vec<(&[EV_KEY], &[EV_KEY])> = KEY_SETTINGS
+        let single_hotkeys: Vec<(&[EV_KEY], &[EV_KEY])> = key_config
             .iter()
             .filter(|(input, _)| input.len() == 1)
             .copied()
             .collect();
-        let all_input_keys: HashSet<EV_KEY> = KEY_SETTINGS
+        let all_input_keys: HashSet<EV_KEY> = key_config
             .iter()
             .flat_map(|(i, _)| i.iter())
             .copied()
@@ -126,6 +118,9 @@ impl KeyRecorder {
                         &all_input_keys,
                         &tx_clone,
                     ),
+                    KeyRecorderBehavior::EventWrite(e) => {
+                        key_writer.write_event(&e).unwrap();
+                    }
                 }
             }
         });
@@ -136,5 +131,9 @@ impl KeyRecorder {
         self.tx
             .send(KeyRecorderBehavior::SendKey((key, time)))
             .unwrap();
+    }
+
+    pub fn event_write(&self, e: InputEvent) {
+        self.tx.send(KeyRecorderBehavior::EventWrite(e)).unwrap();
     }
 }
