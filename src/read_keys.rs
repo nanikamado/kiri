@@ -158,12 +158,11 @@ impl KeyRecorder {
                     },
                 )
                 .collect();
-        let single_hotkeys_map: HashMap<(EV_KEY, State), (&[EV_KEY], Option<State>)> =
-            key_config
-                .iter()
-                .filter(|s| s.input.len() == 1)
-                .map(|s| ((s.input[0], s.cond), (s.output, s.transition)))
-                .collect();
+        let single_hotkeys_map: HashMap<(EV_KEY, State), (&[EV_KEY], Option<State>)> = key_config
+            .iter()
+            .filter(|s| s.input.len() == 1)
+            .map(|s| ((s.input[0], s.cond), (s.output, s.transition)))
+            .collect();
         let pair_input_keys: HashSet<(EV_KEY, State)> = pair_hotkeys
             .iter()
             .flat_map(
@@ -182,13 +181,15 @@ impl KeyRecorder {
             let mut waiting_key: Option<KeyEv> = None;
             for received in rx {
                 match received {
-                    KeyRecorderBehavior::ReleaseSpecificWaitingKey(key) => release_specific_waiting_key_handler(
-                        &mut waiting_key,
-                        key,
-                        &single_hotkeys_map,
-                        &key_writer,
-                        &mut state,
-                    ),
+                    KeyRecorderBehavior::ReleaseSpecificWaitingKey(key) => {
+                        release_specific_waiting_key_handler(
+                            &mut waiting_key,
+                            key,
+                            &single_hotkeys_map,
+                            &key_writer,
+                            &mut state,
+                        )
+                    }
                     KeyRecorderBehavior::SendKey(key) => send_key_handler(
                         &mut waiting_key,
                         key,
