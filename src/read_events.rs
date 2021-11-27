@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use evdev_rs::enums::EventCode;
 use evdev_rs::{Device, InputEvent, ReadFlag, ReadStatus};
 
-use crate::read_keys::{KeyConfig, KeyConfigEntry, KeyRecorder};
+use crate::read_keys::{KeyConfig, KeyRecorder};
 
 fn print_event(ev: &InputEvent) {
     match ev.event_code {
@@ -31,32 +31,9 @@ fn print_sync_dropped_event(ev: &InputEvent) {
     print_event(ev);
 }
 
-use evdev_rs::enums::EV_KEY::{self, *};
-
-
-pub fn run(d: Device) {
-    let key_config_r: &[(&[u64], &[EV_KEY], _, _)] = &[
-        (&[0, 1], &[KEY_HENKAN], &[KEY_ENTER], None),
-        (&[0, 1], &[KEY_MUHENKAN], &[KEY_BACKSPACE], None),
-        (&[0], &[KEY_KPPLUS], &[KEY_KPPLUS], Some(1)),
-        (&[1], &[KEY_KPPLUS], &[KEY_KPPLUS], Some(0)),
-        (&[1], &[KEY_KPSLASH], &[KEY_2], None),
-        (&[1], &[KEY_KPSLASH, KEY_KPASTERISK], &[KEY_4], None),
-        // (&[1], &[KEY_KPSLASH], &[KEY_2], None),
-    ];
-    let key_config: KeyConfig = key_config_r
-        .iter()
-        .flat_map(|(cs, i, o, t)| {
-            cs.iter().map(move |c| KeyConfigEntry {
-                cond: *c,
-                input: *i,
-                output: *o,
-                transition: *t,
-            })
-        })
-        .collect();
-    let key_recorder = KeyRecorder::new(&d, &key_config);
-    let watching_keys: HashSet<_> = key_config.iter().flat_map(|s| s.input.iter()).collect();
+pub fn run(d: Device, config: KeyConfig<'static>) {
+    let key_recorder = KeyRecorder::new(&d, &config);
+    let watching_keys: HashSet<_> = config.iter().flat_map(|s| s.input.iter()).collect();
     loop {
         match d.next_event(ReadFlag::NORMAL | ReadFlag::BLOCKING) {
             Ok((ReadStatus::Success, e)) => {
