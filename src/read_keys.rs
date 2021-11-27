@@ -30,8 +30,9 @@ enum KeyRecorderBehavior {
 
 fn reserve_release_key(key: (EV_KEY, TimeVal), tx: Sender<KeyRecorderBehavior>) {
     thread::spawn(move || {
-        thread::sleep(time::Duration::from_millis(1000));
-        tx.send(KeyRecorderBehavior::ReleaseSpecificWaitingKey(key)).unwrap();
+        thread::sleep(time::Duration::from_millis(50));
+        tx.send(KeyRecorderBehavior::ReleaseSpecificWaitingKey(key))
+            .unwrap();
     });
 }
 
