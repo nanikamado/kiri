@@ -36,8 +36,7 @@ impl KeyWriter {
 
     pub fn write_event(&self, event: &InputEvent) -> Result<(), std::io::Error> {
         self.device.write_event(event)?;
-        self.device
-            .write_event(&InputEvent::new(
+        self.device.write_event(&InputEvent::new(
                 &event.time,
                 &enums::EventCode::EV_SYN(enums::EV_SYN::SYN_REPORT),
                 0,
