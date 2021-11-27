@@ -104,7 +104,6 @@ fn send_key_handler(
                     for output_key in output {
                         key_writer.put_with_time(*output_key, &key.1);
                     }
-                    dbg!("ok");
                     if let Some(s) = transition {
                         println!("state {:?} -> {:?}", *state, s);
                         *state = s;
