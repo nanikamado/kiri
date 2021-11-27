@@ -46,7 +46,6 @@ fn put_single_hotkey(
     state: &mut State,
 ) {
     if let Some((os, tra)) = single_hotkeys.get(&(key.0, *state)) {
-        dbg!(os);
         for output_key in *os {
             key_writer.put_with_time(*output_key, &key.1);
         }
@@ -124,13 +123,10 @@ fn send_key_handler(
             _ => {
                 *previous_key = Some(key);
                 reserve_release_key(key, tx.clone());
-                dbg!("reserved");
             }
         }
     } else {
-        dbg!(&previous_key);
         release_waiting_key(previous_key, single_hotkeys_map, key_writer, state);
-        dbg!(&key);
         put_single_hotkey(key, single_hotkeys_map, key_writer, state);
     }
 }
