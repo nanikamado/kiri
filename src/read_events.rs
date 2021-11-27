@@ -72,7 +72,7 @@ pub fn run(d: Device) {
                         break;
                     }
                     if watching_keys.contains(&key) {
-                        if input_event_velue == 1 {
+                        if input_event_velue == 1 || input_event_velue == 2 {
                             key_recorder.send_key(key, time);
                         }
                     } else {
