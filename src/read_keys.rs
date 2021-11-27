@@ -23,7 +23,7 @@ pub type KeyConfig<'a> = Vec<KeyConfigEntry<'a>>;
 
 #[derive(Debug)]
 enum KeyRecorderBehavior {
-    ReleaseKey(KeyEv),
+    ReleaseSpecificWaitingKey(KeyEv),
     SendKey(KeyEv),
     EventWrite(InputEvent),
 }
@@ -31,7 +31,7 @@ enum KeyRecorderBehavior {
 fn reserve_release_key(key: (EV_KEY, TimeVal), tx: Sender<KeyRecorderBehavior>) {
     thread::spawn(move || {
         thread::sleep(time::Duration::from_millis(1000));
-        tx.send(KeyRecorderBehavior::ReleaseKey(key)).unwrap();
+        tx.send(KeyRecorderBehavior::ReleaseSpecificWaitingKey(key)).unwrap();
     });
 }
 
@@ -58,33 +58,33 @@ fn put_single_hotkey(
     }
 }
 
-fn release_key_handler(
-    previous_key: &mut Option<(EV_KEY, TimeVal)>,
+fn release_specific_waiting_key_handler(
+    waiting_key: &mut Option<(EV_KEY, TimeVal)>,
     key: (EV_KEY, TimeVal),
     single_hotkeys: &HashMap<(EV_KEY, State), (&[EV_KEY], Option<State>)>,
     key_writer: &write_keys::KeyWriter,
     state: &mut State,
 ) {
-    if Some(key) == *previous_key {
-        *previous_key = None;
+    if Some(key) == *waiting_key {
+        *waiting_key = None;
         put_single_hotkey(key, single_hotkeys, key_writer, state);
     }
 }
 
 fn release_waiting_key(
-    previous_key: &mut Option<(EV_KEY, TimeVal)>,
+    waiting_key: &mut Option<(EV_KEY, TimeVal)>,
     single_hotkeys: &HashMap<(EV_KEY, State), (&[EV_KEY], Option<State>)>,
     key_writer: &write_keys::KeyWriter,
     state: &mut State,
 ) {
-    if let Some(key) = *previous_key {
-        *previous_key = None;
+    if let Some(key) = *waiting_key {
+        *waiting_key = None;
         put_single_hotkey(key, single_hotkeys, key_writer, state);
     }
 }
 
 fn send_key_handler(
-    previous_key: &mut Option<(EV_KEY, TimeVal)>,
+    waiting_key: &mut Option<(EV_KEY, TimeVal)>,
     key: (EV_KEY, TimeVal),
     pair_hotkeys_map: &HashMap<(BTreeSet<EV_KEY>, State), (&[EV_KEY], Option<State>)>,
     key_writer: &write_keys::KeyWriter,
@@ -94,12 +94,12 @@ fn send_key_handler(
     tx: &Sender<KeyRecorderBehavior>,
 ) {
     if pair_input_keys.contains(&(key.0, *state)) {
-        match *previous_key {
-            Some((previous_ev_key, previous_key_time)) => {
-                let key_set = [previous_ev_key, key.0];
+        match *waiting_key {
+            Some((waiting_key_kind, waiting_key_time)) => {
+                let key_set = [waiting_key_kind, key.0];
                 let key_set = key_set.iter().copied().collect::<BTreeSet<enums::EV_KEY>>();
                 if let Some(&(output, transition)) = pair_hotkeys_map.get(&(key_set, *state)) {
-                    *previous_key = None;
+                    *waiting_key = None;
                     for output_key in output {
                         key_writer.put_with_time(*output_key, &key.1);
                     }
@@ -111,22 +111,22 @@ fn send_key_handler(
                     return;
                 } else {
                     put_single_hotkey(
-                        (previous_ev_key, previous_key_time),
+                        (waiting_key_kind, waiting_key_time),
                         single_hotkeys_map,
                         key_writer,
                         state,
                     );
-                    *previous_key = Some(key);
+                    *waiting_key = Some(key);
                     reserve_release_key(key, tx.clone());
                 }
             }
             _ => {
-                *previous_key = Some(key);
+                *waiting_key = Some(key);
                 reserve_release_key(key, tx.clone());
             }
         }
     } else {
-        release_waiting_key(previous_key, single_hotkeys_map, key_writer, state);
+        release_waiting_key(waiting_key, single_hotkeys_map, key_writer, state);
         put_single_hotkey(key, single_hotkeys_map, key_writer, state);
     }
 }
@@ -179,18 +179,18 @@ impl KeyRecorder {
         dbg!(&key_config);
         dbg!(&single_hotkeys_map);
         thread::spawn(move || {
-            let mut previous_key: Option<KeyEv> = None;
+            let mut waiting_key: Option<KeyEv> = None;
             for received in rx {
                 match received {
-                    KeyRecorderBehavior::ReleaseKey(key) => release_key_handler(
-                        &mut previous_key,
+                    KeyRecorderBehavior::ReleaseSpecificWaitingKey(key) => release_specific_waiting_key_handler(
+                        &mut waiting_key,
                         key,
                         &single_hotkeys_map,
                         &key_writer,
                         &mut state,
                     ),
                     KeyRecorderBehavior::SendKey(key) => send_key_handler(
-                        &mut previous_key,
+                        &mut waiting_key,
                         key,
                         &pair_hotkeys_map,
                         &key_writer,
@@ -201,7 +201,7 @@ impl KeyRecorder {
                     ),
                     KeyRecorderBehavior::EventWrite(e) => {
                         release_waiting_key(
-                            &mut previous_key,
+                            &mut waiting_key,
                             &single_hotkeys_map,
                             &key_writer,
                             &mut state,
