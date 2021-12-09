@@ -36,15 +36,15 @@ type KeyEv = (enums::EV_KEY, TimeVal);
 
 #[derive(Debug)]
 enum KeyRecorderBehavior {
-    ReleaseSpecificWaitingKey(KeyEv),
+    FireSpecificWaitingKey(KeyEv),
     SendKey(KeyEv),
     EventWrite(InputEvent),
 }
 
-fn reserve_release_key(key: (EV_KEY, TimeVal), tx: Sender<KeyRecorderBehavior>) {
+fn fire_waiting_key_delay(key: (EV_KEY, TimeVal), tx: Sender<KeyRecorderBehavior>) {
     thread::spawn(move || {
         thread::sleep(time::Duration::from_millis(50));
-        tx.send(KeyRecorderBehavior::ReleaseSpecificWaitingKey(key))
+        tx.send(KeyRecorderBehavior::FireSpecificWaitingKey(key))
             .unwrap();
     });
 }
@@ -72,7 +72,7 @@ fn put_single_hotkey(
     }
 }
 
-fn release_specific_waiting_key_handler(
+fn fire_specific_waiting_key_handler(
     waiting_key: &mut Option<(EV_KEY, TimeVal)>,
     key: (EV_KEY, TimeVal),
     single_hotkeys: &HashMap<(EV_KEY, State), (&[EV_KEY], Option<State>)>,
@@ -85,7 +85,7 @@ fn release_specific_waiting_key_handler(
     }
 }
 
-fn release_waiting_key(
+fn fire_waiting_key(
     waiting_key: &mut Option<(EV_KEY, TimeVal)>,
     single_hotkeys: &HashMap<(EV_KEY, State), (&[EV_KEY], Option<State>)>,
     key_writer: &write_keys::KeyWriter,
@@ -130,16 +130,16 @@ fn send_key_handler(
                         state,
                     );
                     *waiting_key = Some(key);
-                    reserve_release_key(key, tx.clone());
+                    fire_waiting_key_delay(key, tx.clone());
                 }
             }
             _ => {
                 *waiting_key = Some(key);
-                reserve_release_key(key, tx.clone());
+                fire_waiting_key_delay(key, tx.clone());
             }
         }
     } else {
-        release_waiting_key(waiting_key, single_hotkeys_map, key_writer, state);
+        fire_waiting_key(waiting_key, single_hotkeys_map, key_writer, state);
         put_single_hotkey(key, single_hotkeys_map, key_writer, state);
     }
 }
@@ -203,8 +203,8 @@ impl KeyRecorder {
             let mut waiting_key: Option<KeyEv> = None;
             for received in rx {
                 match received {
-                    KeyRecorderBehavior::ReleaseSpecificWaitingKey(key) => {
-                        release_specific_waiting_key_handler(
+                    KeyRecorderBehavior::FireSpecificWaitingKey(key) => {
+                        fire_specific_waiting_key_handler(
                             &mut waiting_key,
                             key,
                             &single_hotkeys_map,
@@ -223,7 +223,7 @@ impl KeyRecorder {
                         &tx_clone,
                     ),
                     KeyRecorderBehavior::EventWrite(e) => {
-                        release_waiting_key(
+                        fire_waiting_key(
                             &mut waiting_key,
                             &single_hotkeys_map,
                             &key_writer,
