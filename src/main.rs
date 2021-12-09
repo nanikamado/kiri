@@ -1,6 +1,6 @@
 use evdev_rs::enums::EV_KEY::{self, *};
 use evdev_rs::{GrabMode, UninitDevice};
-use read_keys::{KeyConfig, KeyConfigEntry};
+use read_keys::{KeyConfig, PairHotkeyEntry, SingleHotkeyEntry};
 use std::{fs::File, thread};
 
 mod print_info;
@@ -150,17 +150,32 @@ fn mk_config() -> KeyConfig<'static> {
         (&[1], &[KEY_V], &[KEY_R, KEY_U], None),
         (&[1], &[KEY_B], &[KEY_T, KEY_U], None),
     ];
-    key_config_r
-        .iter()
-        .flat_map(|(cs, i, o, t)| {
-            cs.iter().map(move |c| KeyConfigEntry {
-                cond: *c,
-                input: *i,
-                output: *o,
-                transition: *t,
+    KeyConfig {
+        pair_hotkeys: key_config_r
+            .iter()
+            .filter(|(_, i, _, _)| i.len() == 2)
+            .flat_map(|(cs, i, o, t)| {
+                cs.iter().map(move |c| PairHotkeyEntry {
+                    cond: *c,
+                    input: [i[0], i[1]],
+                    output: *o,
+                    transition: *t,
+                })
             })
-        })
-        .collect()
+            .collect(),
+        single_hotkeys: key_config_r
+            .iter()
+            .filter(|(_, i, _, _)| i.len() == 1)
+            .flat_map(|(cs, i, o, t)| {
+                cs.iter().map(move |c| SingleHotkeyEntry {
+                    cond: *c,
+                    input: i[0],
+                    output: *o,
+                    transition: *t,
+                })
+            })
+            .collect(),
+    }
 }
 
 fn main() {

@@ -33,7 +33,12 @@ fn print_sync_dropped_event(ev: &InputEvent) {
 
 pub fn run(d: Device, config: KeyConfig<'static>) {
     let key_recorder = KeyRecorder::new(&d, &config);
-    let watching_keys: HashSet<_> = config.iter().flat_map(|s| s.input.iter()).collect();
+    let watching_keys: HashSet<_> = config
+        .pair_hotkeys
+        .iter()
+        .flat_map(|s| s.input.iter())
+        .chain(config.single_hotkeys.iter().map(|s| &s.input))
+        .collect();
     loop {
         match d.next_event(ReadFlag::NORMAL | ReadFlag::BLOCKING) {
             Ok((ReadStatus::Success, e)) => {

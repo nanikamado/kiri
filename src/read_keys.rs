@@ -10,16 +10,29 @@ use crate::write_keys;
 
 type State = u64;
 
-#[derive(Debug, Clone, Copy)]
-pub struct KeyConfigEntry<'a> {
+#[derive(PartialEq, Eq, Hash, Debug)]
+pub struct PairHotkeyEntry<'a> {
     pub cond: State,
-    pub input: &'a [EV_KEY],
+    pub input: [EV_KEY; 2],
     pub output: &'a [EV_KEY],
     pub transition: Option<State>,
 }
 
+#[derive(PartialEq, Eq, Hash, Debug)]
+pub struct SingleHotkeyEntry<'a> {
+    pub cond: State,
+    pub input: EV_KEY,
+    pub output: &'a [EV_KEY],
+    pub transition: Option<State>,
+}
+
+#[derive(PartialEq, Eq, Hash, Debug)]
+pub struct KeyConfig<'a> {
+    pub pair_hotkeys: Vec<PairHotkeyEntry<'a>>,
+    pub single_hotkeys: Vec<SingleHotkeyEntry<'a>>,
+}
+
 type KeyEv = (enums::EV_KEY, TimeVal);
-pub type KeyConfig<'a> = Vec<KeyConfigEntry<'a>>;
 
 #[derive(Debug)]
 enum KeyRecorderBehavior {
@@ -136,16 +149,17 @@ impl KeyRecorder {
         let (tx, rx) = channel();
         let tx_clone = tx.clone();
         let key_writer = write_keys::KeyWriter::new(d);
-        let pair_hotkeys: KeyConfig = key_config
-            .iter()
-            .filter(|s| s.input.len() == 2)
-            .copied()
-            .collect();
+        // let pair_hotkeys: Vec<PairHotkeyEntry> = key_config
+        //     .iter()
+        //     .filter(|s| s.input.len() == 2)
+        //     .copied()
+        //     .collect();
         let pair_hotkeys_map: HashMap<(BTreeSet<EV_KEY>, State), (&[EV_KEY], Option<State>)> =
-            pair_hotkeys
+            key_config
+                .pair_hotkeys
                 .iter()
                 .map(
-                    |&KeyConfigEntry {
+                    |&PairHotkeyEntry {
                          cond,
                          input,
                          output,
@@ -159,19 +173,27 @@ impl KeyRecorder {
                 )
                 .collect();
         let single_hotkeys_map: HashMap<(EV_KEY, State), (&[EV_KEY], Option<State>)> = key_config
+            .single_hotkeys
             .iter()
-            .filter(|s| s.input.len() == 1)
-            .map(|s| ((s.input[0], s.cond), (s.output, s.transition)))
+            .map(
+                |&SingleHotkeyEntry {
+                     cond,
+                     input,
+                     output,
+                     transition,
+                 }| ((input, cond), (output, transition)),
+            )
             .collect();
-        let pair_input_keys: HashSet<(EV_KEY, State)> = pair_hotkeys
+        let pair_input_keys: HashSet<(EV_KEY, State)> = key_config
+            .pair_hotkeys
             .iter()
             .flat_map(
-                |&KeyConfigEntry {
+                |&PairHotkeyEntry {
                      cond,
                      input,
                      output: _,
                      transition: _,
-                 }| input.iter().map(move |&i| (i, cond)),
+                 }| input.map(move |i| (i, cond)),
             )
             .collect();
         let mut state = 0;
