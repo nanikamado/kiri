@@ -1,7 +1,7 @@
 use evdev_rs::enums::EV_KEY::{self, *};
 use evdev_rs::{GrabMode, UninitDevice};
 use read_keys::{KeyConfig, KeyInput, PairHotkeyEntry, SingleHotkeyEntry};
-use std::{fs::File, iter, thread};
+use std::{fs::File, thread};
 
 mod print_info;
 mod read_events;
@@ -14,8 +14,8 @@ fn usage() {
 
 fn mk_config() -> KeyConfig<'static> {
     let key_config_r: &[(&[u64], &[EV_KEY], &[EV_KEY], _)] = &[
-        (&[0, 1], &[KEY_HENKAN], &[KEY_ENTER], None),
-        (&[0, 1], &[KEY_MUHENKAN], &[KEY_BACKSPACE], None),
+        (&[0, 1, 2], &[KEY_HENKAN], &[KEY_ENTER], None),
+        (&[0, 1, 2], &[KEY_MUHENKAN], &[KEY_BACKSPACE], None),
         (&[0], &[KEY_GRAVE], &[KEY_HENKAN], Some(1)),
         (&[1], &[KEY_GRAVE], &[KEY_MUHENKAN], Some(0)),
         //
@@ -151,6 +151,27 @@ fn mk_config() -> KeyConfig<'static> {
         (&[1], &[KEY_B], &[KEY_T, KEY_U], None),
     ];
     use KeyInput::{Press, Release};
+    let modifires = [
+        KEY_LEFTCTRL,
+        KEY_LEFTMETA,
+        KEY_LEFTALT,
+        KEY_LEFTSHIFT,
+        KEY_RIGHTCTRL,
+        KEY_RIGHTMETA,
+        KEY_RIGHTALT,
+        KEY_RIGHTSHIFT,
+    ];
+    let modifiers_trans = modifires
+        .iter()
+        .flat_map(|key| {
+            [(1, Press(*key), 2), (2, Release(*key), 1)].map(|(c, i, t)| SingleHotkeyEntry {
+                cond: c,
+                input: i,
+                output: vec![i],
+                transition: Some(t),
+            })
+        })
+        .collect::<Vec<_>>();
     KeyConfig {
         pair_hotkeys: key_config_r
             .iter()
@@ -178,12 +199,15 @@ fn mk_config() -> KeyConfig<'static> {
                     transition: *t,
                 })
             })
-            .chain(iter::once(SingleHotkeyEntry {
-                cond: 0,
-                input: Release(KEY_O),
-                output: vec![Release(KEY_O), Press(KEY_S), Release(KEY_S)],
-                transition: None,
-            }))
+            .chain(modifiers_trans)
+            .collect(),
+        shadowed_keys: key_config_r
+            .iter()
+            .flat_map(|s| {
+                s.1.iter()
+                    .chain(&modifires)
+                    .flat_map(|key| [Press(*key), Release(*key)])
+            })
             .collect(),
     }
 }

@@ -32,10 +32,11 @@ pub struct SingleHotkeyEntry {
     pub transition: Option<State>,
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct KeyConfig<'a> {
     pub pair_hotkeys: Vec<PairHotkeyEntry<'a>>,
     pub single_hotkeys: Vec<SingleHotkeyEntry>,
+    pub shadowed_keys: HashSet<KeyInput>,
 }
 
 type KeyEv = (enums::EV_KEY, TimeVal);

@@ -33,16 +33,7 @@ fn print_sync_dropped_event(ev: &InputEvent) {
 
 pub fn run(d: Device, config: KeyConfig<'static>) {
     let key_recorder = KeyRecorder::new(&d, config.clone());
-    let watching_keys: HashSet<_> = config
-        .pair_hotkeys
-        .iter()
-        .flat_map(|s| s.input.iter())
-        .copied()
-        .chain(config.single_hotkeys.iter().map(|s| match s.input {
-            crate::read_keys::KeyInput::Press(k) => k,
-            crate::read_keys::KeyInput::Release(k) => k,
-        }))
-        .collect();
+    let shadowed_keys: HashSet<_> = config.shadowed_keys;
     loop {
         match d.next_event(ReadFlag::NORMAL | ReadFlag::BLOCKING) {
             Ok((ReadStatus::Success, e)) => {
@@ -57,15 +48,17 @@ pub fn run(d: Device, config: KeyConfig<'static>) {
                     if input_event_velue == 1 && evdev_rs::enums::EV_KEY::KEY_ESC == key {
                         break;
                     }
-                    if watching_keys.contains(&key) {
-                        if input_event_velue == 1 || input_event_velue == 2 {
-                            key_recorder.send_key(KeyInput::Press(key), time);
-                        } else {
+                    let key = match input_event_velue {
+                        1 | 2 => KeyInput::Press(key),
+                        _ => {
                             debug_assert_eq!(input_event_velue, 0);
-                            key_recorder.send_key(KeyInput::Release(key), time);
+                            KeyInput::Release(key)
                         }
+                    };
+                    if shadowed_keys.contains(&key) {
+                        key_recorder.send_key(key, time);
                     } else {
-                        key_recorder.event_write(e)
+                        key_recorder.event_write(e);
                     }
                 }
             }
