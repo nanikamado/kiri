@@ -1,7 +1,7 @@
 use evdev_rs::enums::EV_KEY::{self, *};
 use evdev_rs::{GrabMode, UninitDevice};
-use read_keys::{KeyConfig, PairHotkeyEntry, SingleHotkeyEntry};
-use std::{fs::File, thread};
+use read_keys::{KeyConfig, KeyInput, PairHotkeyEntry, SingleHotkeyEntry};
+use std::{fs::File, iter, thread};
 
 mod print_info;
 mod read_events;
@@ -150,6 +150,7 @@ fn mk_config() -> KeyConfig<'static> {
         (&[1], &[KEY_V], &[KEY_R, KEY_U], None),
         (&[1], &[KEY_B], &[KEY_T, KEY_U], None),
     ];
+    use KeyInput::{Press, Release};
     KeyConfig {
         pair_hotkeys: key_config_r
             .iter()
@@ -169,11 +170,20 @@ fn mk_config() -> KeyConfig<'static> {
             .flat_map(|(cs, i, o, t)| {
                 cs.iter().map(move |c| SingleHotkeyEntry {
                     cond: *c,
-                    input: i[0],
-                    output: *o,
+                    input: Press(i[0]),
+                    output: (*o)
+                        .iter()
+                        .flat_map(|key| [Press(*key), Release(*key)])
+                        .collect::<Vec<_>>(),
                     transition: *t,
                 })
             })
+            .chain(iter::once(SingleHotkeyEntry {
+                cond: 0,
+                input: Release(KEY_O),
+                output: vec![Release(KEY_O), Press(KEY_S), Release(KEY_S)],
+                transition: None,
+            }))
             .collect(),
     }
 }
