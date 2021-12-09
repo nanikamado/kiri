@@ -170,41 +170,6 @@ fn send_key_handler(
             fire_key_input(key, single_hotkeys_map, key_writer, state);
         }
     };
-    // if pair_input_keys.contains(&(key.0, *state)) {
-    //     match *waiting_key {
-    //         Some((waiting_key_kind, waiting_key_time)) => {
-    //             let key_set = [waiting_key_kind, key.0];
-    //             let key_set = key_set.iter().copied().collect::<BTreeSet<enums::EV_KEY>>();
-    //             if let Some(&(output, transition)) = pair_hotkeys_map.get(&(key_set, *state)) {
-    //                 *waiting_key = None;
-    //                 for output_key in output {
-    //                     key_writer.put_with_time(*output_key, &key.1);
-    //                 }
-    //                 if let Some(s) = transition {
-    //                     println!("state {:?} -> {:?}", *state, s);
-    //                     *state = s;
-    //                 }
-    //                 return;
-    //             } else {
-    //                 put_single_hotkey(
-    //                     (waiting_key_kind, waiting_key_time),
-    //                     single_hotkeys_map,
-    //                     key_writer,
-    //                     state,
-    //                 );
-    //                 *waiting_key = Some(key);
-    //                 fire_waiting_key_delay(key, tx.clone());
-    //             }
-    //         }
-    //         _ => {
-    //             *waiting_key = Some(key);
-    //             fire_waiting_key_delay(key, tx.clone());
-    //         }
-    //     }
-    // } else {
-    //     fire_waiting_key(waiting_key, single_hotkeys_map, key_writer, state);
-    //     put_single_hotkey(key, single_hotkeys_map, key_writer, state);
-    // }
 }
 
 impl KeyRecorder {
