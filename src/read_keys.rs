@@ -24,12 +24,42 @@ pub enum KeyInput {
     Release(EV_KEY),
 }
 
+#[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
+pub enum KeyInputKindWithRepeat {
+    Press,
+    Release,
+    Repeat,
+}
+
+impl From<i32> for KeyInputKindWithRepeat {
+    fn from(i: i32) -> Self {
+        match i {
+            0 => Self::Release,
+            1 => Self::Press,
+            2 => Self::Repeat,
+            _ => panic!("unknown input_event value"),
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
+pub struct KeyInputWithRepeat(pub EV_KEY, pub KeyInputKindWithRepeat);
+
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct SingleHotkeyEntry {
     pub cond: State,
     pub input: KeyInput,
     pub output: Vec<KeyInput>,
     pub transition: Option<State>,
+}
+
+impl From<KeyInputWithRepeat> for KeyInput {
+    fn from(KeyInputWithRepeat(name, kind): KeyInputWithRepeat) -> Self {
+        match kind {
+            KeyInputKindWithRepeat::Press | KeyInputKindWithRepeat::Repeat => Self::Press(name),
+            KeyInputKindWithRepeat::Release => Self::Release(name),
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -44,7 +74,7 @@ type KeyEv = (enums::EV_KEY, TimeVal);
 #[derive(Debug)]
 enum KeyRecorderBehavior {
     FireSpecificWaitingKey(KeyEv),
-    SendKey((KeyInput, TimeVal)),
+    SendKey((KeyInputWithRepeat, TimeVal)),
     EventWrite(InputEvent),
 }
 
@@ -125,7 +155,7 @@ fn fire_waiting_key(
 
 fn send_key_handler(
     waiting_key: &mut Option<(EV_KEY, TimeVal)>,
-    key: (KeyInput, TimeVal),
+    key: (KeyInputWithRepeat, TimeVal),
     pair_hotkeys_map: &HashMap<(BTreeSet<EV_KEY>, State), (&[EV_KEY], Option<State>)>,
     key_writer: &write_keys::KeyWriter,
     pair_input_keys: &HashSet<(EV_KEY, State)>,
@@ -134,7 +164,9 @@ fn send_key_handler(
     tx: &Sender<KeyRecorderBehavior>,
 ) {
     match key {
-        (KeyInput::Press(key_name), time) if pair_input_keys.contains(&(key_name, *state)) => {
+        (KeyInputWithRepeat(key_name, KeyInputKindWithRepeat::Press), time)
+            if pair_input_keys.contains(&(key_name, *state)) =>
+        {
             match *waiting_key {
                 Some((waiting_key_kind, waiting_key_time)) => {
                     let key_set = [waiting_key_kind, key_name];
@@ -168,7 +200,7 @@ fn send_key_handler(
         }
         _ => {
             fire_waiting_key(waiting_key, single_hotkeys_map, key_writer, state);
-            fire_key_input(key, single_hotkeys_map, key_writer, state);
+            fire_key_input((key.0.into(), key.1), single_hotkeys_map, key_writer, state);
         }
     };
 }
@@ -265,7 +297,7 @@ impl KeyRecorder {
         KeyRecorder { tx }
     }
 
-    pub fn send_key(&self, key: KeyInput, time: TimeVal) {
+    pub fn send_key(&self, key: KeyInputWithRepeat, time: TimeVal) {
         self.tx
             .send(KeyRecorderBehavior::SendKey((key, time)))
             .unwrap();

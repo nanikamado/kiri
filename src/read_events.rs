@@ -1,9 +1,7 @@
 use std::collections::HashSet;
-
 use evdev_rs::enums::EventCode;
 use evdev_rs::{Device, InputEvent, ReadFlag, ReadStatus};
-
-use crate::read_keys::{KeyConfig, KeyInput, KeyRecorder};
+use crate::read_keys::{KeyConfig, KeyInputWithRepeat, KeyRecorder};
 
 fn print_event(ev: &InputEvent) {
     match ev.event_code {
@@ -48,14 +46,8 @@ pub fn run(d: Device, config: KeyConfig<'static>) {
                     if input_event_velue == 1 && evdev_rs::enums::EV_KEY::KEY_ESC == key {
                         break;
                     }
-                    let key = match input_event_velue {
-                        1 | 2 => KeyInput::Press(key),
-                        _ => {
-                            debug_assert_eq!(input_event_velue, 0);
-                            KeyInput::Release(key)
-                        }
-                    };
-                    if shadowed_keys.contains(&key) {
+                    let key = KeyInputWithRepeat(key, input_event_velue.into());
+                    if shadowed_keys.contains(&key.into()) {
                         key_recorder.send_key(key, time);
                     } else {
                         key_recorder.event_write(e);
