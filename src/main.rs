@@ -1,15 +1,11 @@
-use evdev::{Key, Device};
+use evdev::Key;
 use evdev_keys::*;
 use read_keys::{KeyConfig, KeyInput, PairHotkeyEntry, SingleHotkeyEntry};
 
+mod get_devices;
 mod read_events;
 mod read_keys;
 mod write_keys;
-mod get_devices;
-
-fn usage() {
-    println!("Usage: evtest /path/to/device");
-}
 
 fn mk_config() -> KeyConfig {
     let key_config_r: &[(&[u64], &[Key], &[Key], _)] = &[
@@ -202,7 +198,11 @@ fn mk_config() -> KeyConfig {
     let modifiers_trans = modifires
         .iter()
         .flat_map(|key| {
-            [(1, KeyInput::press(*key), 2), (2, KeyInput::release(*key), 1)].map(|(c, i, t)| SingleHotkeyEntry {
+            [
+                (1, KeyInput::press(*key), 2),
+                (2, KeyInput::release(*key), 1),
+            ]
+            .map(|(c, i, t)| SingleHotkeyEntry {
                 cond: c,
                 input: i,
                 output: vec![i],
@@ -265,13 +265,5 @@ fn mk_config() -> KeyConfig {
 }
 
 fn main() {
-    let mut args = std::env::args();
-    if args.len() != 2 {
-        usage();
-        std::process::exit(1);
-    }
-    let path = &args.nth(1).unwrap();
-    let mut d = Device::open(path).unwrap();
-    d.grab().unwrap();
-    read_events::run(d, mk_config());
+    read_events::run(mk_config());
 }
