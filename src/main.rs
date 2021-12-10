@@ -1,19 +1,18 @@
-use evdev_rs::enums::EV_KEY::{self, *};
-use evdev_rs::{GrabMode, UninitDevice};
+use evdev::{Key, Device};
+use evdev_keys::*;
 use read_keys::{KeyConfig, KeyInput, PairHotkeyEntry, SingleHotkeyEntry};
-use std::{fs::File, thread};
 
-mod print_info;
 mod read_events;
 mod read_keys;
 mod write_keys;
+mod get_devices;
 
 fn usage() {
     println!("Usage: evtest /path/to/device");
 }
 
 fn mk_config() -> KeyConfig {
-    let key_config_r: &[(&[u64], &[EV_KEY], &[EV_KEY], _)] = &[
+    let key_config_r: &[(&[u64], &[Key], &[Key], _)] = &[
         (&[0, 1, 2], &[KEY_HENKAN], &[KEY_ENTER], None),
         (&[0, 1, 2], &[KEY_MUHENKAN], &[KEY_BACKSPACE], None),
         (&[0], &[KEY_GRAVE], &[KEY_HENKAN], Some(1)),
@@ -155,16 +154,15 @@ fn mk_config() -> KeyConfig {
         (&[1], &[KEY_B], &[KEY_T, KEY_U], None),
         (&[1], &[KEY_R, KEY_G], &[KEY_SLASH], None),
     ];
-    use KeyInput::{Press, Release};
-    let pair_keys_with_modifiers_config: &[(&[u64], [EV_KEY; 2], Vec<_>, Option<u64>)] = &[
+    let pair_keys_with_modifiers_config: &[(&[u64], [Key; 2], Vec<_>, Option<u64>)] = &[
         (
             &[1],
             [KEY_J, KEY_N],
             vec![
-                Press(KEY_LEFTSHIFT),
-                Press(KEY_SLASH),
-                Release(KEY_SLASH),
-                Release(KEY_LEFTSHIFT),
+                KeyInput::press(KEY_LEFTSHIFT),
+                KeyInput::press(KEY_SLASH),
+                KeyInput::release(KEY_SLASH),
+                KeyInput::release(KEY_LEFTSHIFT),
             ],
             None,
         ),
@@ -172,10 +170,10 @@ fn mk_config() -> KeyConfig {
             &[1],
             [KEY_F, KEY_V],
             vec![
-                Press(KEY_LEFTSHIFT),
-                Press(KEY_1),
-                Release(KEY_1),
-                Release(KEY_LEFTSHIFT),
+                KeyInput::press(KEY_LEFTSHIFT),
+                KeyInput::press(KEY_1),
+                KeyInput::release(KEY_1),
+                KeyInput::release(KEY_LEFTSHIFT),
             ],
             None,
         ),
@@ -183,10 +181,10 @@ fn mk_config() -> KeyConfig {
             &[1],
             [KEY_F, KEY_B],
             vec![
-                Press(KEY_LEFTSHIFT),
-                Press(KEY_1),
-                Release(KEY_1),
-                Release(KEY_LEFTSHIFT),
+                KeyInput::press(KEY_LEFTSHIFT),
+                KeyInput::press(KEY_1),
+                KeyInput::release(KEY_1),
+                KeyInput::release(KEY_LEFTSHIFT),
             ],
             None,
         ),
@@ -204,7 +202,7 @@ fn mk_config() -> KeyConfig {
     let modifiers_trans = modifires
         .iter()
         .flat_map(|key| {
-            [(1, Press(*key), 2), (2, Release(*key), 1)].map(|(c, i, t)| SingleHotkeyEntry {
+            [(1, KeyInput::press(*key), 2), (2, KeyInput::release(*key), 1)].map(|(c, i, t)| SingleHotkeyEntry {
                 cond: c,
                 input: i,
                 output: vec![i],
@@ -222,7 +220,7 @@ fn mk_config() -> KeyConfig {
                     input: [i[0], i[1]],
                     output: o
                         .iter()
-                        .flat_map(|key| [Press(*key), Release(*key)])
+                        .flat_map(|key| [KeyInput::press(*key), KeyInput::release(*key)])
                         .collect(),
                     transition: *t,
                 })
@@ -246,10 +244,10 @@ fn mk_config() -> KeyConfig {
             .flat_map(|(cs, i, o, t)| {
                 cs.iter().map(move |c| SingleHotkeyEntry {
                     cond: *c,
-                    input: Press(i[0]),
+                    input: KeyInput::press(i[0]),
                     output: (*o)
                         .iter()
-                        .flat_map(|key| [Press(*key), Release(*key)])
+                        .flat_map(|key| [KeyInput::press(*key), KeyInput::release(*key)])
                         .collect::<Vec<_>>(),
                     transition: *t,
                 })
@@ -261,7 +259,7 @@ fn mk_config() -> KeyConfig {
             .flat_map(|s| s.1)
             .chain(&modifires)
             .chain(pair_keys_with_modifiers_config.iter().flat_map(|s| &s.1))
-            .flat_map(|key| [Press(*key), Release(*key)])
+            .flat_map(|key| [KeyInput::press(*key), KeyInput::release(*key)])
             .collect(),
     }
 }
@@ -273,11 +271,7 @@ fn main() {
         std::process::exit(1);
     }
     let path = &args.nth(1).unwrap();
-    let f = File::open(path).unwrap();
-    let u_d = UninitDevice::new().unwrap();
-    let mut d = u_d.set_file(f).unwrap();
-    thread::sleep(std::time::Duration::from_secs(1));
-    print_info::print_info(&d);
-    d.grab(GrabMode::Grab).unwrap();
+    let mut d = Device::open(path).unwrap();
+    d.grab().unwrap();
     read_events::run(d, mk_config());
 }

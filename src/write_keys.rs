@@ -1,77 +1,45 @@
+use evdev::{
+    uinput::{VirtualDevice, VirtualDeviceBuilder},
+    Device, EventType, InputEvent, Key,
+};
+
 use crate::read_keys::KeyInput;
-use evdev_rs::{enums, Device, InputEvent, TimeVal, UInputDevice};
+// use evdev_rs::{enums, Device, InputEvent, TimeVal, UInputDevice};
 
 pub struct KeyWriter {
-    device: UInputDevice,
+    device: VirtualDevice,
 }
 
 impl KeyWriter {
     pub fn new(d: &Device) -> KeyWriter {
         KeyWriter {
-            device: UInputDevice::create_from_device(d).unwrap(),
+            device: VirtualDeviceBuilder::new()
+                .unwrap()
+                .name(b"kiri virtual keyboard")
+                .with_keys(d.supported_keys().unwrap())
+                .unwrap()
+                .input_id(d.input_id())
+                .build()
+                .unwrap(),
         }
     }
 
-    pub fn put_with_time(&self, key: evdev_rs::enums::EV_KEY, time: &TimeVal) {
-        self.device
-            .write_event(&InputEvent::new(time, &enums::EventCode::EV_KEY(key), 1))
-            .unwrap();
-        self.device
-            .write_event(&InputEvent::new(
-                time,
-                &enums::EventCode::EV_SYN(enums::EV_SYN::SYN_REPORT),
-                0,
-            ))
-            .unwrap();
-        self.device
-            .write_event(&InputEvent::new(time, &enums::EventCode::EV_KEY(key), 0))
-            .unwrap();
-        self.device
-            .write_event(&InputEvent::new(
-                time,
-                &enums::EventCode::EV_SYN(enums::EV_SYN::SYN_REPORT),
-                0,
-            ))
-            .unwrap();
+    pub fn put_with_time(&mut self, key: Key) {
+        let msg = [
+            InputEvent::new(EventType::KEY, key.code(), 1),
+            InputEvent::new(EventType::KEY, key.code(), 0),
+        ];
+        self.device.emit(&msg).unwrap();
     }
 
-    pub fn fire_key_input(&self, key: KeyInput, time: &TimeVal) {
+    pub fn fire_key_input(&mut self, key: KeyInput) {
         log::debug!("{:?}", key);
-        match key {
-            KeyInput::Press(k) => {
-                self.device
-                    .write_event(&InputEvent::new(time, &enums::EventCode::EV_KEY(k), 1))
-                    .unwrap();
-                self.device
-                    .write_event(&InputEvent::new(
-                        time,
-                        &enums::EventCode::EV_SYN(enums::EV_SYN::SYN_REPORT),
-                        0,
-                    ))
-                    .unwrap();
-            }
-            KeyInput::Release(k) => {
-                self.device
-                    .write_event(&InputEvent::new(time, &enums::EventCode::EV_KEY(k), 0))
-                    .unwrap();
-                self.device
-                    .write_event(&InputEvent::new(
-                        time,
-                        &enums::EventCode::EV_SYN(enums::EV_SYN::SYN_REPORT),
-                        0,
-                    ))
-                    .unwrap();
-            }
-        }
+        let msg = [InputEvent::new(EventType::KEY, key.0.code(), key.1.into())];
+        self.device.emit(&msg).unwrap();
     }
 
-    pub fn write_event(&self, event: &InputEvent) -> Result<(), std::io::Error> {
+    pub fn write_event(&mut self, event: &InputEvent) -> Result<(), std::io::Error> {
         log::debug!("{:?}", event);
-        self.device.write_event(event)?;
-        self.device.write_event(&InputEvent::new(
-            &event.time,
-            &enums::EventCode::EV_SYN(enums::EV_SYN::SYN_REPORT),
-            0,
-        ))
+        self.device.emit(&[*event])
     }
 }

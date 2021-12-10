@@ -1,73 +1,26 @@
+use evdev::{Device, InputEventKind, Key};
 use std::collections::HashSet;
-use evdev_rs::enums::EventCode;
-use evdev_rs::{Device, InputEvent, ReadFlag, ReadStatus};
 use crate::read_keys::{KeyConfig, KeyInputWithRepeat, KeyRecorder};
 
-fn print_event(ev: &InputEvent) {
-    match ev.event_code {
-        EventCode::EV_SYN(_) => log::info!(
-            "Event: time {}.{}, ++++++++++++++++++++ {} +++++++++++++++",
-            ev.time.tv_sec,
-            ev.time.tv_usec,
-            ev.event_type().unwrap()
-        ),
-        _ => log::info!(
-            "Event: time {}.{}, type {} , code {} , value {}",
-            ev.time.tv_sec,
-            ev.time.tv_usec,
-            ev.event_type()
-                .map(|ev_type| format!("{}", ev_type))
-                .unwrap_or_else(|| "None".to_owned()),
-            ev.event_code,
-            ev.value
-        ),
-    }
-}
-
-fn print_sync_dropped_event(ev: &InputEvent) {
-    log::info!("SYNC DROPPED: ");
-    print_event(ev);
-}
-
-pub fn run(d: Device, config: KeyConfig) {
+pub fn run(mut d: Device, config: KeyConfig) {
     env_logger::init();
     let key_recorder = KeyRecorder::new(&d, config.clone());
     log::info!("config loaded");
     let shadowed_keys: HashSet<_> = config.shadowed_keys;
     loop {
-        match d.next_event(ReadFlag::NORMAL | ReadFlag::BLOCKING) {
-            Ok((ReadStatus::Success, e)) => {
-                log::debug!("{}, {}", e.event_code, e.value);
-                if let InputEvent {
-                    event_code: EventCode::EV_KEY(key),
-                    time,
-                    value: input_event_velue,
-                    ..
-                } = e
-                {
-                    if input_event_velue == 1 && evdev_rs::enums::EV_KEY::KEY_CALC == key {
-                        break;
-                    }
-                    let key = KeyInputWithRepeat(key, input_event_velue.into());
-                    if shadowed_keys.contains(&key.into()) {
-                        key_recorder.send_key(key, time);
-                    } else {
-                        key_recorder.event_write(e);
-                    }
-                }
-            }
-            Ok((ReadStatus::Sync, e)) => {
-                log::info!("::::::::::::::::::::: dropped ::::::::::::::::::::::");
-                print_sync_dropped_event(&e);
-                while let Ok((ReadStatus::Sync, e)) = d.next_event(ReadFlag::SYNC) {
-                    print_sync_dropped_event(&e)
-                }
-                log::info!("::::::::::::::::::::: re-synced ::::::::::::::::::::");
-            }
-            Err(err) => {
-                if !matches!(err.raw_os_error(), Some(libc::EAGAIN)) {
-                    log::error!("{}", err);
+        for input_event in d.fetch_events().expect("cannot read device") {
+            log::debug!("{:?}", input_event.kind());
+            log::debug!("{:?}", input_event.value());
+            if let InputEventKind::Key(key) = input_event.kind()
+            {
+                if input_event.value() == 1 && Key::KEY_CALC == key {
                     break;
+                }
+                let key = KeyInputWithRepeat(key, input_event.value().into());
+                if shadowed_keys.contains(&key.into()) {
+                    key_recorder.send_key(key, input_event.timestamp());
+                } else {
+                    key_recorder.event_write(input_event);
                 }
             }
         }
