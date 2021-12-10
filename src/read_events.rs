@@ -43,7 +43,7 @@ pub fn run(d: Device, config: KeyConfig) {
                     ..
                 } = e
                 {
-                    if input_event_velue == 1 && evdev_rs::enums::EV_KEY::KEY_ESC == key {
+                    if input_event_velue == 1 && evdev_rs::enums::EV_KEY::KEY_CALC == key {
                         break;
                     }
                     let key = KeyInputWithRepeat(key, input_event_velue.into());
