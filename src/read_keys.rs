@@ -101,7 +101,7 @@ fn put_single_hotkey(
             key_writer.fire_key_input(*output_key, &key.1);
         }
         if let Some(s) = tra {
-            println!("state {:?} -> {:?}", *state, s);
+            log::debug!("state {:?} -> {:?}", *state, s);
             *state = *s;
         }
     } else {
@@ -120,7 +120,7 @@ fn fire_key_input(
             key_writer.fire_key_input(*output_key, &key.1);
         }
         if let Some(s) = tra {
-            println!("state {:?} -> {:?}", *state, s);
+            log::debug!("state {:?} -> {:?}", *state, s);
             *state = *s;
         }
     } else {
@@ -177,7 +177,7 @@ fn send_key_handler(
                             key_writer.fire_key_input(*output_key, &key.1);
                         }
                         if let Some(s) = transition {
-                            println!("state {:?} -> {:?}", *state, s);
+                            log::debug!("state {:?} -> {:?}", *state, s);
                             *state = s;
                         }
                         return;
@@ -211,7 +211,7 @@ impl KeyRecorder {
         let tx_clone = tx.clone();
         let key_writer = write_keys::KeyWriter::new(d);
         let mut state = 0;
-        dbg!(&key_config);
+        log::debug!("{:?}", key_config);
         thread::spawn(move || {
             let pair_hotkeys_map: HashMap<(BTreeSet<EV_KEY>, State), (&[KeyInput], Option<State>)> =
                 key_config
@@ -248,7 +248,7 @@ impl KeyRecorder {
                         },
                     )
                     .collect();
-            dbg!(&single_hotkeys_map);
+            log::debug!("{:?}", single_hotkeys_map);
             let pair_input_keys: HashSet<(EV_KEY, State)> = key_config
                 .pair_hotkeys
                 .iter()

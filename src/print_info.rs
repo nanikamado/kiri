@@ -10,17 +10,17 @@ fn print_abs_bits(dev: &Device, axis: &EV_ABS) {
 
     let abs = dev.abs_info(&code).unwrap();
 
-    println!("\tValue\t{}", abs.value);
-    println!("\tMin\t{}", abs.minimum);
-    println!("\tMax\t{}", abs.maximum);
+    log::debug!("\tValue\t{}", abs.value);
+    log::debug!("\tMin\t{}", abs.minimum);
+    log::debug!("\tMax\t{}", abs.maximum);
     if abs.fuzz != 0 {
-        println!("\tFuzz\t{}", abs.fuzz);
+        log::debug!("\tFuzz\t{}", abs.fuzz);
     }
     if abs.flat != 0 {
-        println!("\tFlat\t{}", abs.flat);
+        log::debug!("\tFlat\t{}", abs.flat);
     }
     if abs.resolution != 0 {
-        println!("\tResolution\t{}", abs.resolution);
+        log::debug!("\tResolution\t{}", abs.resolution);
     }
 }
 
@@ -33,7 +33,7 @@ fn print_code_bits(dev: &Device, ev_code: &EventCode, max: &EventCode) {
             continue;
         }
 
-        println!("    Event code: {}", code);
+        log::debug!("    Event code: {}", code);
         if let EventCode::EV_ABS(k) = code {
             print_abs_bits(dev, &k)
         }
@@ -41,11 +41,11 @@ fn print_code_bits(dev: &Device, ev_code: &EventCode, max: &EventCode) {
 }
 
 fn print_bits(dev: &Device) {
-    println!("Supported events:");
+    log::debug!("Supported events:");
 
     for ev_type in EventType::EV_SYN.iter() {
         if dev.has(&ev_type) {
-            println!("  Event type: {} ", ev_type);
+            log::debug!("  Event type: {} ", ev_type);
         }
 
         match ev_type {
@@ -75,26 +75,26 @@ fn print_bits(dev: &Device) {
 }
 
 fn print_props(dev: &Device) {
-    println!("Properties:");
+    log::debug!("Properties:");
 
     for input_prop in InputProp::INPUT_PROP_POINTER.iter() {
         if dev.has(&input_prop) {
-            println!("  Property type: {}", input_prop);
+            log::debug!("  Property type: {}", input_prop);
         }
     }
 }
 
 pub fn print_info(d: &evdev_rs::Device) {
-    println!(
+    log::debug!(
         "Input device ID: bus 0x{:x} vendor 0x{:x} product 0x{:x}",
         d.bustype(),
         d.vendor_id(),
         d.product_id()
     );
-    println!("Evdev version: {:x}", d.driver_version());
-    println!("Input device name: \"{}\"", d.name().unwrap_or(""));
-    println!("Phys location: {}", d.phys().unwrap_or(""));
-    println!("Uniq identifier: {}", d.uniq().unwrap_or(""));
+    log::debug!("Evdev version: {:x}", d.driver_version());
+    log::debug!("Input device name: \"{}\"", d.name().unwrap_or(""));
+    log::debug!("Phys location: {}", d.phys().unwrap_or(""));
+    log::debug!("Uniq identifier: {}", d.uniq().unwrap_or(""));
 
     print_bits(d);
     print_props(d);

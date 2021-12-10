@@ -134,7 +134,7 @@ fn mk_config() -> KeyConfig {
         (&[1], &[KEY_S, KEY_SEMICOLON], &[KEY_S, KEY_O], None),
         (&[1], &[KEY_S, KEY_N], &[KEY_W, KEY_A], None),
         (&[1], &[KEY_S, KEY_M], &[KEY_D, KEY_A], None),
-        (&[1], &[KEY_S, KEY_COMMA], &[KEY_P, KEY_E], None),
+        (&[1], &[KEY_S, KEY_COMMA], &[KEY_P, KEY_I], None),
         (&[1], &[KEY_S, KEY_DOT], &[KEY_P, KEY_O], None),
         (&[1], &[KEY_S, KEY_SLASH], &[KEY_T, KEY_Y, KEY_E], None),
         (&[1], &[KEY_S, KEY_Y], &[KEY_S, KEY_Y, KEY_E], None),

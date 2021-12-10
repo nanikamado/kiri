@@ -1,5 +1,5 @@
-use evdev_rs::{enums, Device, InputEvent, TimeVal, UInputDevice};
 use crate::read_keys::KeyInput;
+use evdev_rs::{enums, Device, InputEvent, TimeVal, UInputDevice};
 
 pub struct KeyWriter {
     device: UInputDevice,
@@ -36,7 +36,7 @@ impl KeyWriter {
     }
 
     pub fn fire_key_input(&self, key: KeyInput, time: &TimeVal) {
-        dbg!(key);
+        log::debug!("{:?}", key);
         match key {
             KeyInput::Press(k) => {
                 self.device
@@ -66,7 +66,7 @@ impl KeyWriter {
     }
 
     pub fn write_event(&self, event: &InputEvent) -> Result<(), std::io::Error> {
-        dbg!(event);
+        log::debug!("{:?}", event);
         self.device.write_event(event)?;
         self.device.write_event(&InputEvent::new(
             &event.time,

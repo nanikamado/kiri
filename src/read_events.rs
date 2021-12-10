@@ -5,13 +5,13 @@ use crate::read_keys::{KeyConfig, KeyInputWithRepeat, KeyRecorder};
 
 fn print_event(ev: &InputEvent) {
     match ev.event_code {
-        EventCode::EV_SYN(_) => println!(
+        EventCode::EV_SYN(_) => log::info!(
             "Event: time {}.{}, ++++++++++++++++++++ {} +++++++++++++++",
             ev.time.tv_sec,
             ev.time.tv_usec,
             ev.event_type().unwrap()
         ),
-        _ => println!(
+        _ => log::info!(
             "Event: time {}.{}, type {} , code {} , value {}",
             ev.time.tv_sec,
             ev.time.tv_usec,
@@ -25,17 +25,19 @@ fn print_event(ev: &InputEvent) {
 }
 
 fn print_sync_dropped_event(ev: &InputEvent) {
-    print!("SYNC DROPPED: ");
+    log::info!("SYNC DROPPED: ");
     print_event(ev);
 }
 
 pub fn run(d: Device, config: KeyConfig) {
+    env_logger::init();
     let key_recorder = KeyRecorder::new(&d, config.clone());
+    log::info!("config loaded");
     let shadowed_keys: HashSet<_> = config.shadowed_keys;
     loop {
         match d.next_event(ReadFlag::NORMAL | ReadFlag::BLOCKING) {
             Ok((ReadStatus::Success, e)) => {
-                println!("{}, {}", e.event_code, e.value);
+                log::debug!("{}, {}", e.event_code, e.value);
                 if let InputEvent {
                     event_code: EventCode::EV_KEY(key),
                     time,
@@ -55,16 +57,16 @@ pub fn run(d: Device, config: KeyConfig) {
                 }
             }
             Ok((ReadStatus::Sync, e)) => {
-                println!("::::::::::::::::::::: dropped ::::::::::::::::::::::");
+                log::info!("::::::::::::::::::::: dropped ::::::::::::::::::::::");
                 print_sync_dropped_event(&e);
                 while let Ok((ReadStatus::Sync, e)) = d.next_event(ReadFlag::SYNC) {
                     print_sync_dropped_event(&e)
                 }
-                println!("::::::::::::::::::::: re-synced ::::::::::::::::::::");
+                log::info!("::::::::::::::::::::: re-synced ::::::::::::::::::::");
             }
             Err(err) => {
                 if !matches!(err.raw_os_error(), Some(libc::EAGAIN)) {
-                    println!("{}", err);
+                    log::error!("{}", err);
                     break;
                 }
             }
