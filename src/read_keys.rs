@@ -11,10 +11,10 @@ use crate::write_keys;
 type State = u64;
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
-pub struct PairHotkeyEntry<'a> {
+pub struct PairHotkeyEntry {
     pub cond: State,
     pub input: [EV_KEY; 2],
-    pub output: &'a [EV_KEY],
+    pub output: Vec<KeyInput>,
     pub transition: Option<State>,
 }
 
@@ -63,8 +63,8 @@ impl From<KeyInputWithRepeat> for KeyInput {
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub struct KeyConfig<'a> {
-    pub pair_hotkeys: Vec<PairHotkeyEntry<'a>>,
+pub struct KeyConfig {
+    pub pair_hotkeys: Vec<PairHotkeyEntry>,
     pub single_hotkeys: Vec<SingleHotkeyEntry>,
     pub shadowed_keys: HashSet<KeyInput>,
 }
@@ -156,7 +156,7 @@ fn fire_waiting_key(
 fn send_key_handler(
     waiting_key: &mut Option<(EV_KEY, TimeVal)>,
     key: (KeyInputWithRepeat, TimeVal),
-    pair_hotkeys_map: &HashMap<(BTreeSet<EV_KEY>, State), (&[EV_KEY], Option<State>)>,
+    pair_hotkeys_map: &HashMap<(BTreeSet<EV_KEY>, State), (&[KeyInput], Option<State>)>,
     key_writer: &write_keys::KeyWriter,
     pair_input_keys: &HashSet<(EV_KEY, State)>,
     single_hotkeys_map: &HashMap<(KeyInput, State), (&[KeyInput], Option<State>)>,
@@ -174,7 +174,7 @@ fn send_key_handler(
                     if let Some(&(output, transition)) = pair_hotkeys_map.get(&(key_set, *state)) {
                         *waiting_key = None;
                         for output_key in output {
-                            key_writer.put_with_time(*output_key, &key.1);
+                            key_writer.fire_key_input(*output_key, &key.1);
                         }
                         if let Some(s) = transition {
                             println!("state {:?} -> {:?}", *state, s);
@@ -206,27 +206,28 @@ fn send_key_handler(
 }
 
 impl KeyRecorder {
-    pub fn new(d: &Device, key_config: KeyConfig<'static>) -> KeyRecorder {
+    pub fn new(d: &Device, key_config: KeyConfig) -> KeyRecorder {
         let (tx, rx) = channel();
         let tx_clone = tx.clone();
         let key_writer = write_keys::KeyWriter::new(d);
         let mut state = 0;
         dbg!(&key_config);
         thread::spawn(move || {
-            let pair_hotkeys_map: HashMap<(BTreeSet<EV_KEY>, State), (&[EV_KEY], Option<State>)> =
+            let pair_hotkeys_map: HashMap<(BTreeSet<EV_KEY>, State), (&[KeyInput], Option<State>)> =
                 key_config
                     .pair_hotkeys
                     .iter()
                     .map(
-                        |&PairHotkeyEntry {
+                        |PairHotkeyEntry {
                              cond,
                              input,
                              output,
                              transition,
-                         }| {
+                         }|
+                         -> (_, (&[KeyInput], _)) {
                             (
-                                (input.iter().copied().collect(), cond),
-                                (output, transition),
+                                (input.iter().copied().collect(), *cond),
+                                (output, *transition),
                             )
                         },
                     )

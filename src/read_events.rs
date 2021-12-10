@@ -29,7 +29,7 @@ fn print_sync_dropped_event(ev: &InputEvent) {
     print_event(ev);
 }
 
-pub fn run(d: Device, config: KeyConfig<'static>) {
+pub fn run(d: Device, config: KeyConfig) {
     let key_recorder = KeyRecorder::new(&d, config.clone());
     let shadowed_keys: HashSet<_> = config.shadowed_keys;
     loop {

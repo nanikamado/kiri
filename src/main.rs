@@ -12,12 +12,16 @@ fn usage() {
     println!("Usage: evtest /path/to/device");
 }
 
-fn mk_config() -> KeyConfig<'static> {
+fn mk_config() -> KeyConfig {
     let key_config_r: &[(&[u64], &[EV_KEY], &[EV_KEY], _)] = &[
         (&[0, 1, 2], &[KEY_HENKAN], &[KEY_ENTER], None),
         (&[0, 1, 2], &[KEY_MUHENKAN], &[KEY_BACKSPACE], None),
         (&[0], &[KEY_GRAVE], &[KEY_HENKAN], Some(1)),
         (&[1], &[KEY_GRAVE], &[KEY_MUHENKAN], Some(0)),
+        (&[0], &[KEY_F, KEY_J], &[KEY_HENKAN], Some(1)),
+        (&[1], &[KEY_F, KEY_J], &[KEY_MUHENKAN], Some(0)),
+        (&[0], &[KEY_CAPSLOCK], &[KEY_HENKAN], Some(1)),
+        (&[1], &[KEY_CAPSLOCK], &[KEY_MUHENKAN], Some(0)),
         //
         (&[1], &[KEY_A], &[KEY_N, KEY_O], None),
         (&[1], &[KEY_S], &[KEY_T, KEY_O], None),
@@ -151,6 +155,30 @@ fn mk_config() -> KeyConfig<'static> {
         (&[1], &[KEY_B], &[KEY_T, KEY_U], None),
     ];
     use KeyInput::{Press, Release};
+    let pair_keys_with_modifiers_config: &[(&[u64], [EV_KEY; 2], Vec<_>, Option<u64>)] = &[
+        (
+            &[1],
+            [KEY_J, KEY_N],
+            vec![
+                Press(KEY_LEFTSHIFT),
+                Press(KEY_SLASH),
+                Release(KEY_SLASH),
+                Release(KEY_LEFTSHIFT),
+            ],
+            None,
+        ),
+        (
+            &[1],
+            [KEY_F, KEY_V],
+            vec![
+                Press(KEY_LEFTSHIFT),
+                Press(KEY_1),
+                Release(KEY_1),
+                Release(KEY_LEFTSHIFT),
+            ],
+            None,
+        ),
+    ];
     let modifires = [
         KEY_LEFTCTRL,
         KEY_LEFTMETA,
@@ -180,10 +208,25 @@ fn mk_config() -> KeyConfig<'static> {
                 cs.iter().map(move |c| PairHotkeyEntry {
                     cond: *c,
                     input: [i[0], i[1]],
-                    output: *o,
+                    output: o
+                        .iter()
+                        .flat_map(|key| [Press(*key), Release(*key)])
+                        .collect(),
                     transition: *t,
                 })
             })
+            .chain(
+                pair_keys_with_modifiers_config
+                    .iter()
+                    .flat_map(|(cs, i, o, t)| {
+                        cs.iter().map(move |c| PairHotkeyEntry {
+                            cond: *c,
+                            input: *i,
+                            output: o.clone(),
+                            transition: *t,
+                        })
+                    }),
+            )
             .collect(),
         single_hotkeys: key_config_r
             .iter()
@@ -203,11 +246,10 @@ fn mk_config() -> KeyConfig<'static> {
             .collect(),
         shadowed_keys: key_config_r
             .iter()
-            .flat_map(|s| {
-                s.1.iter()
-                    .chain(&modifires)
-                    .flat_map(|key| [Press(*key), Release(*key)])
-            })
+            .flat_map(|s| s.1)
+            .chain(&modifires)
+            .chain(pair_keys_with_modifiers_config.iter().flat_map(|s| &s.1))
+            .flat_map(|key| [Press(*key), Release(*key)])
             .collect(),
     }
 }
