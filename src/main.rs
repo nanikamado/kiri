@@ -153,6 +153,7 @@ fn mk_config() -> KeyConfig {
         (&[1], &[KEY_C], &[KEY_K, KEY_I], None),
         (&[1], &[KEY_V], &[KEY_R, KEY_U], None),
         (&[1], &[KEY_B], &[KEY_T, KEY_U], None),
+        (&[1], &[KEY_R, KEY_G], &[KEY_SLASH], None),
     ];
     use KeyInput::{Press, Release};
     let pair_keys_with_modifiers_config: &[(&[u64], [EV_KEY; 2], Vec<_>, Option<u64>)] = &[
@@ -170,6 +171,17 @@ fn mk_config() -> KeyConfig {
         (
             &[1],
             [KEY_F, KEY_V],
+            vec![
+                Press(KEY_LEFTSHIFT),
+                Press(KEY_1),
+                Release(KEY_1),
+                Release(KEY_LEFTSHIFT),
+            ],
+            None,
+        ),
+        (
+            &[1],
+            [KEY_F, KEY_B],
             vec![
                 Press(KEY_LEFTSHIFT),
                 Press(KEY_1),
