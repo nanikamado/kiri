@@ -1,4 +1,5 @@
 use crate::read_keys::{KeyConfig, KeyInputWithRepeat, KeyRecorder};
+use env_logger::Env;
 use evdev::{Device, InputEvent, InputEventKind, Key};
 use std::{
     collections::HashSet,
@@ -33,7 +34,7 @@ pub fn make_read_channel(devices: impl Iterator<Item = Device>) -> Receiver<Inpu
 }
 
 pub fn run(config: KeyConfig) {
-    env_logger::init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     let keyboards = get_keyboard_devices().collect::<Vec<_>>();
     if keyboards.is_empty() {
         eprintln!("keyboard not found");
