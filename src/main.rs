@@ -2,7 +2,6 @@ use evdev::Key;
 use evdev_keys::*;
 use read_keys::{KeyConfig, KeyInput, PairHotkeyEntry, SingleHotkeyEntry};
 
-mod get_devices;
 mod read_events;
 mod read_keys;
 mod write_keys;
