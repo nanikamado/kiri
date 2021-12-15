@@ -1,14 +1,10 @@
-// use evdev_rs::enums::Key;
-// use evdev_rs::*;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::time::SystemTime;
 use std::{
     sync::mpsc::{channel, Sender},
     thread, time,
 };
-
 use evdev::{Device, Key};
-
 use crate::write_keys;
 
 type State = u64;

@@ -2,9 +2,7 @@ use evdev::{
     uinput::{VirtualDevice, VirtualDeviceBuilder},
     Device, EventType, InputEvent,
 };
-
 use crate::read_keys::KeyInput;
-// use evdev_rs::{enums, Device, InputEvent, TimeVal, UInputDevice};
 
 pub struct KeyWriter {
     device: VirtualDevice,
