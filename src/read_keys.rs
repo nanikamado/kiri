@@ -93,7 +93,6 @@ impl From<KeyInputWithRepeat> for KeyInput {
 pub struct KeyConfig {
     pub pair_hotkeys: Vec<PairHotkeyEntry>,
     pub single_hotkeys: Vec<SingleHotkeyEntry>,
-    pub shadowed_keys: HashSet<KeyInput>,
 }
 
 type KeyEv = (Key, SystemTime);

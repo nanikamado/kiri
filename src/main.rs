@@ -381,14 +381,6 @@ fn mk_config() -> KeyConfig {
             )
             .chain(modifiers_trans)
             .collect(),
-        shadowed_keys: key_config_r
-            .iter()
-            .flat_map(|s| s.1)
-            .chain(&modifires)
-            .chain(pair_keys_with_modifiers_config.iter().flat_map(|s| &s.1))
-            .chain(single_keys_with_modifires_config.iter().map(|s| &s.1))
-            .flat_map(|key| [KeyInput::press(*key), KeyInput::release(*key)])
-            .collect(),
     }
 }
 
