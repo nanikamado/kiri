@@ -12,8 +12,8 @@ fn mk_config() -> KeyConfig {
         (&[0, 1, 2], &[KEY_MUHENKAN], &[KEY_BACKSPACE], None),
         (&[0], &[KEY_GRAVE], &[KEY_HENKAN], Some(1)),
         (&[1], &[KEY_GRAVE], &[KEY_MUHENKAN], Some(0)),
-        (&[0], &[KEY_F, KEY_J], &[KEY_HENKAN], Some(1)),
-        (&[1], &[KEY_F, KEY_J], &[KEY_MUHENKAN], Some(0)),
+        // (&[0], &[KEY_F, KEY_J], &[KEY_HENKAN], Some(1)),
+        // (&[1], &[KEY_F, KEY_J], &[KEY_MUHENKAN], Some(0)),
         (&[0], &[KEY_CAPSLOCK], &[KEY_HENKAN], Some(1)),
         (&[1], &[KEY_CAPSLOCK], &[KEY_MUHENKAN], Some(0)),
         //
@@ -147,11 +147,51 @@ fn mk_config() -> KeyConfig {
         (&[1], &[KEY_C], &[KEY_K, KEY_I], None),
         (&[1], &[KEY_V], &[KEY_R, KEY_U], None),
         (&[1], &[KEY_B], &[KEY_T, KEY_U], None),
+        //
         (&[1], &[KEY_R, KEY_G], &[KEY_SLASH], None),
+        (
+            &[1],
+            &[KEY_H, KEY_J],
+            &[KEY_RIGHTBRACE, KEY_BACKSLASH, KEY_RIGHT],
+            None,
+        ),
+        (&[0], &[KEY_H, KEY_J], &[KEY_RIGHTBRACE], None),
+        (&[0], &[KEY_D, KEY_SEMICOLON], &[KEY_END], None),
+        (&[0], &[KEY_A, KEY_K], &[KEY_HOME], None),
+        (&[0], &[KEY_F, KEY_SEMICOLON], &[KEY_END], None),
+        (&[0], &[KEY_A, KEY_J], &[KEY_HOME], None),
+    ];
+    let single_keys_with_modifires_config: &[(&[u64], Key, Vec<_>, Option<u64>)] = &[
+        (
+            &[0],
+            KEY_CAPSLOCK,
+            vec![
+                KeyInput::press(KEY_LEFTMETA),
+                KeyInput::press(KEY_SPACE),
+                KeyInput::release(KEY_SPACE),
+                KeyInput::release(KEY_LEFTMETA),
+            ],
+            Some(1),
+        ),
+        (
+            &[1],
+            KEY_CAPSLOCK,
+            vec![
+                KeyInput::press(KEY_LEFTCTRL),
+                KeyInput::press(KEY_RIGHTBRACE),
+                KeyInput::release(KEY_RIGHTBRACE),
+                KeyInput::release(KEY_LEFTCTRL),
+                KeyInput::press(KEY_LEFTMETA),
+                KeyInput::press(KEY_SPACE),
+                KeyInput::release(KEY_SPACE),
+                KeyInput::release(KEY_LEFTMETA),
+            ],
+            Some(0),
+        ),
     ];
     let pair_keys_with_modifiers_config: &[(&[u64], [Key; 2], Vec<_>, Option<u64>)] = &[
         (
-            &[1],
+            &[1, 0],
             [KEY_J, KEY_N],
             vec![
                 KeyInput::press(KEY_LEFTSHIFT),
@@ -162,7 +202,7 @@ fn mk_config() -> KeyConfig {
             None,
         ),
         (
-            &[1],
+            &[1, 0],
             [KEY_F, KEY_V],
             vec![
                 KeyInput::press(KEY_LEFTSHIFT),
@@ -173,7 +213,7 @@ fn mk_config() -> KeyConfig {
             None,
         ),
         (
-            &[1],
+            &[1, 0],
             [KEY_F, KEY_B],
             vec![
                 KeyInput::press(KEY_LEFTSHIFT),
@@ -182,6 +222,73 @@ fn mk_config() -> KeyConfig {
                 KeyInput::release(KEY_LEFTSHIFT),
             ],
             None,
+        ),
+        (
+            &[1],
+            [KEY_F, KEY_G],
+            vec![
+                KeyInput::press(KEY_LEFTSHIFT),
+                KeyInput::press(KEY_8),
+                KeyInput::release(KEY_8),
+                KeyInput::press(KEY_9),
+                KeyInput::release(KEY_LEFTSHIFT),
+                KeyInput::release(KEY_9),
+                // KeyInput::press(KEY_LEFTCTRL),
+                // KeyInput::press(KEY_LEFTBRACE),
+                // KeyInput::release(KEY_LEFTBRACE),
+                // KeyInput::release(KEY_LEFTCTRL),
+                // KeyInput::press(KEY_LEFT),
+                // KeyInput::release(KEY_LEFT),
+            ],
+            None,
+        ),
+        (
+            &[0],
+            [KEY_D, KEY_F],
+            vec![
+                KeyInput::press(KEY_LEFTSHIFT),
+                KeyInput::press(KEY_8),
+                KeyInput::release(KEY_8),
+                KeyInput::release(KEY_LEFTSHIFT),
+            ],
+            None,
+        ),
+        (
+            &[0],
+            [KEY_F, KEY_G],
+            vec![
+                KeyInput::press(KEY_LEFTSHIFT),
+                KeyInput::press(KEY_9),
+                KeyInput::release(KEY_9),
+                KeyInput::release(KEY_LEFTSHIFT),
+            ],
+            None,
+        ),
+        (
+            &[0],
+            [KEY_F, KEY_J],
+            vec![
+                KeyInput::press(KEY_LEFTMETA),
+                KeyInput::press(KEY_SPACE),
+                KeyInput::release(KEY_SPACE),
+                KeyInput::release(KEY_LEFTMETA),
+            ],
+            Some(1),
+        ),
+        (
+            &[1],
+            [KEY_F, KEY_J],
+            vec![
+                KeyInput::press(KEY_LEFTCTRL),
+                KeyInput::press(KEY_RIGHTBRACE),
+                KeyInput::release(KEY_RIGHTBRACE),
+                KeyInput::release(KEY_LEFTCTRL),
+                KeyInput::press(KEY_LEFTMETA),
+                KeyInput::press(KEY_SPACE),
+                KeyInput::release(KEY_SPACE),
+                KeyInput::release(KEY_LEFTMETA),
+            ],
+            Some(0),
         ),
     ];
     let modifires = [
@@ -251,6 +358,18 @@ fn mk_config() -> KeyConfig {
                     transition: *t,
                 })
             })
+            .chain(
+                single_keys_with_modifires_config
+                    .iter()
+                    .flat_map(|(cs, i, o, t)| {
+                        cs.iter().map(move |c| SingleHotkeyEntry {
+                            cond: *c,
+                            input: KeyInput::press(*i),
+                            output: o.clone(),
+                            transition: *t,
+                        })
+                    }),
+            )
             .chain(modifiers_trans)
             .collect(),
         shadowed_keys: key_config_r
@@ -258,6 +377,7 @@ fn mk_config() -> KeyConfig {
             .flat_map(|s| s.1)
             .chain(&modifires)
             .chain(pair_keys_with_modifiers_config.iter().flat_map(|s| &s.1))
+            .chain(single_keys_with_modifires_config.iter().map(|s| &s.1))
             .flat_map(|key| [KeyInput::press(*key), KeyInput::release(*key)])
             .collect(),
     }
