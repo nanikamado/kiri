@@ -7,7 +7,7 @@ use std::{
     thread, time,
 };
 
-use evdev::{Key, InputEvent, Device};
+use evdev::{Device, InputEvent, Key};
 
 use crate::write_keys;
 
@@ -17,8 +17,7 @@ type State = u64;
 pub struct PairHotkeyEntry {
     pub cond: State,
     pub input: [Key; 2],
-    pub output: Vec<KeyInput>,
-    pub transition: Option<State>,
+    pub action: Action,
 }
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
@@ -76,12 +75,15 @@ pub struct SingleHotkeyEntry {
     pub input: KeyInput,
     pub output: Vec<KeyInput>,
     pub transition: Option<State>,
+    pub input_canceler: Vec<KeyInput>,
 }
 
 impl From<KeyInputWithRepeat> for KeyInput {
     fn from(KeyInputWithRepeat(name, kind): KeyInputWithRepeat) -> Self {
         match kind {
-            KeyInputKindWithRepeat::Press | KeyInputKindWithRepeat::Repeat => Self(name, KeyInputKind::Press),
+            KeyInputKindWithRepeat::Press | KeyInputKindWithRepeat::Repeat => {
+                Self(name, KeyInputKind::Press)
+            }
             KeyInputKindWithRepeat::Release => Self(name, KeyInputKind::Release),
         }
     }
@@ -115,119 +117,155 @@ pub struct KeyRecorder {
     tx: Sender<KeyRecorderBehavior>,
 }
 
-fn put_single_hotkey(
-    key: (Key, SystemTime),
-    single_hotkeys: &HashMap<(KeyInput, State), (&[KeyInput], Option<State>)>,
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Action {
+    pub output_keys: Vec<KeyInput>,
+    pub transition: Option<State>,
+    pub input_canceler: Vec<KeyInput>,
+}
+
+fn perform_action(
+    action: &Action,
     key_writer: &mut write_keys::KeyWriter,
     state: &mut State,
+    input_canceler: &mut HashSet<KeyInput>,
 ) {
-    if let Some((os, tra)) = single_hotkeys.get(&(KeyInput::press(key.0), *state)) {
-        for output_key in *os {
-            key_writer.fire_key_input(*output_key);
-        }
-        if let Some(s) = tra {
-            log::debug!("state {:?} -> {:?}", *state, s);
-            *state = *s;
-        }
+    for output_key in &action.output_keys {
+        key_writer.fire_key_input(*output_key);
+    }
+    if let Some(s) = action.transition {
+        log::debug!("state {:?} -> {:?}", *state, s);
+        *state = s;
+    }
+    for c in &action.input_canceler {
+        input_canceler.insert(*c);
+    }
+}
+
+fn put_single_hotkey(
+    key: Key,
+    single_hotkeys: &HashMap<(KeyInput, State), Action>,
+    key_writer: &mut write_keys::KeyWriter,
+    state: &mut State,
+    input_canceler: &mut HashSet<KeyInput>,
+) {
+    if let Some(action) = single_hotkeys.get(&(KeyInput::press(key), *state)) {
+        perform_action(action, key_writer, state, input_canceler);
     } else {
-        key_writer.put_with_time(key.0);
+        key_writer.put_with_time(key);
     }
 }
 
 fn fire_key_input(
-    key: (KeyInput, SystemTime),
-    single_hotkeys: &HashMap<(KeyInput, State), (&[KeyInput], Option<State>)>,
+    key: KeyInput,
+    single_hotkeys: &HashMap<(KeyInput, State), Action>,
     key_writer: &mut write_keys::KeyWriter,
     state: &mut State,
+    input_canceler: &mut HashSet<KeyInput>,
 ) {
-    if let Some((outputs, tra)) = single_hotkeys.get(&(key.0, *state)) {
-        for output_key in *outputs {
-            key_writer.fire_key_input(*output_key);
-        }
-        if let Some(s) = tra {
-            log::debug!("state {:?} -> {:?}", *state, s);
-            *state = *s;
-        }
+    if let Some(action) = single_hotkeys.get(&(key, *state)) {
+        perform_action(action, key_writer, state, input_canceler);
     } else {
-        key_writer.fire_key_input(key.0);
+        key_writer.fire_key_input(key);
     }
 }
 
 fn fire_specific_waiting_key_handler(
     waiting_key: &mut Option<(Key, SystemTime)>,
     key: (Key, SystemTime),
-    single_hotkeys: &HashMap<(KeyInput, State), (&[KeyInput], Option<State>)>,
+    single_hotkeys: &HashMap<(KeyInput, State), Action>,
     key_writer: &mut write_keys::KeyWriter,
     state: &mut State,
+    input_canceler: &mut HashSet<KeyInput>,
 ) {
     if Some(key) == *waiting_key {
         *waiting_key = None;
-        put_single_hotkey(key, single_hotkeys, key_writer, state);
+        put_single_hotkey(key.0, single_hotkeys, key_writer, state, input_canceler);
     }
 }
 
 fn fire_waiting_key(
     waiting_key: &mut Option<(Key, SystemTime)>,
-    single_hotkeys: &HashMap<(KeyInput, State), (&[KeyInput], Option<State>)>,
+    single_hotkeys: &HashMap<(KeyInput, State), Action>,
     key_writer: &mut write_keys::KeyWriter,
     state: &mut State,
+    input_canceler: &mut HashSet<KeyInput>,
 ) {
-    if let Some(key) = *waiting_key {
+    if let Some((key, _)) = *waiting_key {
         *waiting_key = None;
-        put_single_hotkey(key, single_hotkeys, key_writer, state);
+        put_single_hotkey(key, single_hotkeys, key_writer, state, input_canceler);
     }
 }
 
 fn send_key_handler(
     waiting_key: &mut Option<(Key, SystemTime)>,
     key: (KeyInputWithRepeat, SystemTime),
-    pair_hotkeys_map: &HashMap<(BTreeSet<Key>, State), (&[KeyInput], Option<State>)>,
+    pair_hotkeys_map: &HashMap<(BTreeSet<Key>, State), Action>,
     key_writer: &mut write_keys::KeyWriter,
     pair_input_keys: &HashSet<(Key, State)>,
-    single_hotkeys_map: &HashMap<(KeyInput, State), (&[KeyInput], Option<State>)>,
+    single_hotkeys_map: &HashMap<(KeyInput, State), Action>,
     state: &mut State,
+    input_canceler: &mut HashSet<KeyInput>,
     tx: &Sender<KeyRecorderBehavior>,
 ) {
-    match key {
-        (KeyInputWithRepeat(key_name, KeyInputKindWithRepeat::Press), time)
-            if pair_input_keys.contains(&(key_name, *state)) =>
-        {
-            match *waiting_key {
-                Some((waiting_key_kind, waiting_key_time)) => {
-                    let key_set = [waiting_key_kind, key_name];
-                    let key_set = key_set.iter().copied().collect::<BTreeSet<Key>>();
-                    if let Some(&(output, transition)) = pair_hotkeys_map.get(&(key_set, *state)) {
-                        *waiting_key = None;
-                        for output_key in output {
-                            key_writer.fire_key_input(*output_key);
+    if !input_canceler.remove(&key.0.into()) {
+        match key {
+            (KeyInputWithRepeat(key_name, KeyInputKindWithRepeat::Press), time)
+                if pair_input_keys.contains(&(key_name, *state)) =>
+            {
+                match *waiting_key {
+                    Some((waiting_key_kind, _)) => {
+                        let key_set = [waiting_key_kind, key_name];
+                        let key_set = key_set.iter().copied().collect::<BTreeSet<Key>>();
+                        if let Some(action) = pair_hotkeys_map.get(&(key_set, *state)) {
+                            *waiting_key = None;
+                            for output_key in &action.output_keys {
+                                key_writer.fire_key_input(*output_key);
+                            }
+                            if let Some(s) = action.transition {
+                                log::debug!("state {:?} -> {:?}", *state, s);
+                                *state = s;
+                            }
+                            for c in &action.input_canceler {
+                                input_canceler.insert(*c);
+                            }
+                            return;
+                        } else {
+                            put_single_hotkey(
+                                waiting_key_kind,
+                                single_hotkeys_map,
+                                key_writer,
+                                state,
+                                input_canceler,
+                            );
+                            *waiting_key = Some((key_name, time));
+                            fire_waiting_key_delay((key_name, time), tx.clone());
                         }
-                        if let Some(s) = transition {
-                            log::debug!("state {:?} -> {:?}", *state, s);
-                            *state = s;
-                        }
-                        return;
-                    } else {
-                        put_single_hotkey(
-                            (waiting_key_kind, waiting_key_time),
-                            single_hotkeys_map,
-                            key_writer,
-                            state,
-                        );
+                    }
+                    _ => {
                         *waiting_key = Some((key_name, time));
                         fire_waiting_key_delay((key_name, time), tx.clone());
                     }
                 }
-                _ => {
-                    *waiting_key = Some((key_name, time));
-                    fire_waiting_key_delay((key_name, time), tx.clone());
-                }
             }
-        }
-        _ => {
-            fire_waiting_key(waiting_key, single_hotkeys_map, key_writer, state);
-            fire_key_input((key.0.into(), key.1), single_hotkeys_map, key_writer, state);
-        }
-    };
+            _ => {
+                fire_waiting_key(
+                    waiting_key,
+                    single_hotkeys_map,
+                    key_writer,
+                    state,
+                    input_canceler,
+                );
+                fire_key_input(
+                    key.0.into(),
+                    single_hotkeys_map,
+                    key_writer,
+                    state,
+                    input_canceler,
+                );
+            }
+        };
+    }
 }
 
 impl KeyRecorder {
@@ -238,42 +276,6 @@ impl KeyRecorder {
         let mut state = 0;
         log::debug!("{:?}", key_config);
         thread::spawn(move || {
-            let pair_hotkeys_map: HashMap<(BTreeSet<Key>, State), (&[KeyInput], Option<State>)> =
-                key_config
-                    .pair_hotkeys
-                    .iter()
-                    .map(
-                        |PairHotkeyEntry {
-                             cond,
-                             input,
-                             output,
-                             transition,
-                         }|
-                         -> (_, (&[KeyInput], _)) {
-                            (
-                                (input.iter().copied().collect(), *cond),
-                                (output, *transition),
-                            )
-                        },
-                    )
-                    .collect();
-            let single_hotkeys_map: HashMap<(KeyInput, State), (&[KeyInput], Option<State>)> =
-                key_config
-                    .single_hotkeys
-                    .iter()
-                    .map(
-                        |SingleHotkeyEntry {
-                             cond,
-                             input,
-                             output,
-                             transition,
-                         }|
-                         -> (_, (&[KeyInput], _)) {
-                            ((*input, *cond), (output, *transition))
-                        },
-                    )
-                    .collect();
-            log::debug!("{:?}", single_hotkeys_map);
             let pair_input_keys: HashSet<(Key, State)> = key_config
                 .pair_hotkeys
                 .iter()
@@ -281,11 +283,45 @@ impl KeyRecorder {
                     |&PairHotkeyEntry {
                          cond,
                          input,
-                         output: _,
-                         transition: _,
+                         action: _,
                      }| input.map(move |i| (i, cond)),
                 )
                 .collect();
+            let pair_hotkeys_map: HashMap<(BTreeSet<Key>, State), Action> = key_config
+                .pair_hotkeys
+                .into_iter()
+                .map(
+                    |PairHotkeyEntry {
+                         cond,
+                         input,
+                         action,
+                     }| { ((input.iter().copied().collect(), cond), action) },
+                )
+                .collect();
+            let single_hotkeys_map: HashMap<(KeyInput, State), Action> = key_config
+                .single_hotkeys
+                .into_iter()
+                .map(
+                    |SingleHotkeyEntry {
+                         cond,
+                         input,
+                         output,
+                         transition,
+                         input_canceler,
+                     }| {
+                        (
+                            (input, cond),
+                            Action {
+                                output_keys: output,
+                                transition,
+                                input_canceler,
+                            },
+                        )
+                    },
+                )
+                .collect();
+            log::debug!("{:?}", single_hotkeys_map);
+            let mut input_canceler: HashSet<KeyInput> = HashSet::new();
             let mut waiting_key: Option<KeyEv> = None;
             for received in rx {
                 match received {
@@ -296,6 +332,7 @@ impl KeyRecorder {
                             &single_hotkeys_map,
                             &mut key_writer,
                             &mut state,
+                            &mut input_canceler,
                         )
                     }
                     KeyRecorderBehavior::SendKey(key) => send_key_handler(
@@ -306,6 +343,7 @@ impl KeyRecorder {
                         &pair_input_keys,
                         &single_hotkeys_map,
                         &mut state,
+                        &mut input_canceler,
                         &tx_clone,
                     ),
                     KeyRecorderBehavior::EventWrite(e) => {
@@ -314,6 +352,7 @@ impl KeyRecorder {
                             &single_hotkeys_map,
                             &mut key_writer,
                             &mut state,
+                            &mut input_canceler,
                         );
                         key_writer.write_event(&e).unwrap();
                     }

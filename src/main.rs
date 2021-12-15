@@ -1,6 +1,6 @@
 use evdev::Key;
 use evdev_keys::*;
-use read_keys::{KeyConfig, KeyInput, PairHotkeyEntry, SingleHotkeyEntry};
+use read_keys::{KeyConfig, KeyInput, PairHotkeyEntry, SingleHotkeyEntry, Action};
 
 mod read_events;
 mod read_keys;
@@ -313,6 +313,7 @@ fn mk_config() -> KeyConfig {
                 input: i,
                 output: vec![i],
                 transition: Some(t),
+                input_canceler: Vec::new(),
             })
         })
         .collect::<Vec<_>>();
@@ -324,11 +325,14 @@ fn mk_config() -> KeyConfig {
                 cs.iter().map(move |c| PairHotkeyEntry {
                     cond: *c,
                     input: [i[0], i[1]],
-                    output: o
-                        .iter()
-                        .flat_map(|key| [KeyInput::press(*key), KeyInput::release(*key)])
-                        .collect(),
-                    transition: *t,
+                    action: Action {
+                        output_keys: o
+                            .iter()
+                            .flat_map(|key| [KeyInput::press(*key), KeyInput::release(*key)])
+                            .collect(),
+                        transition: *t,
+                        input_canceler: i.iter().copied().map(KeyInput::release).collect(),
+                    },
                 })
             })
             .chain(
@@ -338,8 +342,11 @@ fn mk_config() -> KeyConfig {
                         cs.iter().map(move |c| PairHotkeyEntry {
                             cond: *c,
                             input: *i,
-                            output: o.clone(),
-                            transition: *t,
+                            action: Action {
+                                output_keys: o.clone(),
+                                transition: *t,
+                                input_canceler: i.iter().copied().map(KeyInput::release).collect(),
+                            },
                         })
                     }),
             )
@@ -356,6 +363,7 @@ fn mk_config() -> KeyConfig {
                         .flat_map(|key| [KeyInput::press(*key), KeyInput::release(*key)])
                         .collect::<Vec<_>>(),
                     transition: *t,
+                    input_canceler: vec![KeyInput::release(i[0])],
                 })
             })
             .chain(
@@ -367,6 +375,7 @@ fn mk_config() -> KeyConfig {
                             input: KeyInput::press(*i),
                             output: o.clone(),
                             transition: *t,
+                            input_canceler: vec![KeyInput::release(*i)],
                         })
                     }),
             )
