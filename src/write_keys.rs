@@ -1,6 +1,6 @@
 use evdev::{
     uinput::{VirtualDevice, VirtualDeviceBuilder},
-    Device, EventType, InputEvent, Key,
+    Device, EventType, InputEvent,
 };
 
 use crate::read_keys::KeyInput;
@@ -24,22 +24,10 @@ impl KeyWriter {
         }
     }
 
-    pub fn put_with_time(&mut self, key: Key) {
-        let msg = [
-            InputEvent::new(EventType::KEY, key.code(), 1),
-            InputEvent::new(EventType::KEY, key.code(), 0),
-        ];
-        self.device.emit(&msg).unwrap();
-    }
-
     pub fn fire_key_input(&mut self, key: KeyInput) {
         log::debug!("{:?}", key);
         let msg = [InputEvent::new(EventType::KEY, key.0.code(), key.1.into())];
         self.device.emit(&msg).unwrap();
-    }
-
-    pub fn write_event(&mut self, event: &InputEvent) -> Result<(), std::io::Error> {
-        log::debug!("{:?}", event);
-        self.device.emit(&[*event])
+        std::thread::sleep(core::time::Duration::from_millis(5));
     }
 }

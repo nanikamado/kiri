@@ -2,21 +2,19 @@ use crate::read_keys::{KeyConfig, KeyInputWithRepeat, KeyRecorder};
 use env_logger::Env;
 use evdev::{Device, InputEvent, InputEventKind, Key};
 use std::{
-    collections::HashSet,
     process::exit,
     sync::mpsc::{channel, Receiver},
     thread,
 };
 
 pub fn get_keyboard_devices() -> impl Iterator<Item = Device> {
-    evdev::enumerate()
-        .filter(|device| {
-            device.supported_keys().map_or(false, |supported_keys| {
-                supported_keys.contains(Key::KEY_A)
-                    && supported_keys.contains(Key::KEY_Z)
-                    && supported_keys.contains(Key::KEY_SPACE)
-            })
+    evdev::enumerate().filter(|device| {
+        device.supported_keys().map_or(false, |supported_keys| {
+            supported_keys.contains(Key::KEY_A)
+                && supported_keys.contains(Key::KEY_Z)
+                && supported_keys.contains(Key::KEY_SPACE)
         })
+    })
 }
 
 pub fn make_read_channel(devices: impl Iterator<Item = Device>) -> Receiver<InputEvent> {
@@ -42,7 +40,6 @@ pub fn run(config: KeyConfig) {
     }
     let key_recorder = KeyRecorder::new(&keyboards[0], config.clone());
     log::info!("config loaded");
-    let shadowed_keys: HashSet<_> = config.shadowed_keys;
     for input_event in make_read_channel(keyboards.into_iter()) {
         log::debug!("{:?}", input_event.kind());
         log::debug!("{:?}", input_event.value());
@@ -51,11 +48,7 @@ pub fn run(config: KeyConfig) {
                 break;
             }
             let key = KeyInputWithRepeat(key, input_event.value().into());
-            if shadowed_keys.contains(&key.into()) {
-                key_recorder.send_key(key, input_event.timestamp());
-            } else {
-                key_recorder.event_write(input_event);
-            }
+            key_recorder.send_key(key, input_event.timestamp());
         }
     }
 }

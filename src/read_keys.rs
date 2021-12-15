@@ -7,7 +7,7 @@ use std::{
     thread, time,
 };
 
-use evdev::{Device, InputEvent, Key};
+use evdev::{Device, Key};
 
 use crate::write_keys;
 
@@ -102,7 +102,6 @@ type KeyEv = (Key, SystemTime);
 enum KeyRecorderBehavior {
     FireSpecificWaitingKey(KeyEv),
     SendKey((KeyInputWithRepeat, SystemTime)),
-    EventWrite(InputEvent),
 }
 
 fn fire_waiting_key_delay(key: (Key, SystemTime), tx: Sender<KeyRecorderBehavior>) {
@@ -142,20 +141,6 @@ fn perform_action(
     }
 }
 
-fn put_single_hotkey(
-    key: Key,
-    single_hotkeys: &HashMap<(KeyInput, State), Action>,
-    key_writer: &mut write_keys::KeyWriter,
-    state: &mut State,
-    input_canceler: &mut HashSet<KeyInput>,
-) {
-    if let Some(action) = single_hotkeys.get(&(KeyInput::press(key), *state)) {
-        perform_action(action, key_writer, state, input_canceler);
-    } else {
-        key_writer.put_with_time(key);
-    }
-}
-
 fn fire_key_input(
     key: KeyInput,
     single_hotkeys: &HashMap<(KeyInput, State), Action>,
@@ -180,7 +165,13 @@ fn fire_specific_waiting_key_handler(
 ) {
     if Some(key) == *waiting_key {
         *waiting_key = None;
-        put_single_hotkey(key.0, single_hotkeys, key_writer, state, input_canceler);
+        fire_key_input(
+            KeyInput::press(key.0),
+            single_hotkeys,
+            key_writer,
+            state,
+            input_canceler,
+        );
     }
 }
 
@@ -193,7 +184,13 @@ fn fire_waiting_key(
 ) {
     if let Some((key, _)) = *waiting_key {
         *waiting_key = None;
-        put_single_hotkey(key, single_hotkeys, key_writer, state, input_canceler);
+        fire_key_input(
+            KeyInput::press(key),
+            single_hotkeys,
+            key_writer,
+            state,
+            input_canceler,
+        );
     }
 }
 
@@ -219,20 +216,11 @@ fn send_key_handler(
                         let key_set = key_set.iter().copied().collect::<BTreeSet<Key>>();
                         if let Some(action) = pair_hotkeys_map.get(&(key_set, *state)) {
                             *waiting_key = None;
-                            for output_key in &action.output_keys {
-                                key_writer.fire_key_input(*output_key);
-                            }
-                            if let Some(s) = action.transition {
-                                log::debug!("state {:?} -> {:?}", *state, s);
-                                *state = s;
-                            }
-                            for c in &action.input_canceler {
-                                input_canceler.insert(*c);
-                            }
+                            perform_action(action, key_writer, state, input_canceler);
                             return;
                         } else {
-                            put_single_hotkey(
-                                waiting_key_kind,
+                            fire_key_input(
+                                KeyInput::press(waiting_key_kind),
                                 single_hotkeys_map,
                                 key_writer,
                                 state,
@@ -346,16 +334,6 @@ impl KeyRecorder {
                         &mut input_canceler,
                         &tx_clone,
                     ),
-                    KeyRecorderBehavior::EventWrite(e) => {
-                        fire_waiting_key(
-                            &mut waiting_key,
-                            &single_hotkeys_map,
-                            &mut key_writer,
-                            &mut state,
-                            &mut input_canceler,
-                        );
-                        key_writer.write_event(&e).unwrap();
-                    }
                 }
             }
         });
@@ -366,9 +344,5 @@ impl KeyRecorder {
         self.tx
             .send(KeyRecorderBehavior::SendKey((key, time)))
             .unwrap();
-    }
-
-    pub fn event_write(&self, e: InputEvent) {
-        self.tx.send(KeyRecorderBehavior::EventWrite(e)).unwrap();
     }
 }
