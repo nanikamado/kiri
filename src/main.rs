@@ -1,12 +1,15 @@
 use evdev::Key;
 use evdev_keys::*;
-use read_keys::{KeyConfig, KeyInput, PairHotkeyEntry, SingleHotkeyEntry, Action};
+use read_keys::{KeyConfig, KeyInput, PairHotkeyEntry, SingleHotkeyEntry};
 
 mod read_events;
 mod read_keys;
 mod write_keys;
 
 fn mk_config() -> KeyConfig {
+    // 0 : normal
+    // 1 : jp input
+    // 2 : jp input with modifiers
     let key_config_r: &[(&[u64], &[Key], &[Key], _)] = &[
         (&[0, 1, 2], &[KEY_HENKAN], &[KEY_ENTER], None),
         (&[0, 1, 2], &[KEY_MUHENKAN], &[KEY_BACKSPACE], None),
@@ -325,14 +328,11 @@ fn mk_config() -> KeyConfig {
                 cs.iter().map(move |c| PairHotkeyEntry {
                     cond: *c,
                     input: [i[0], i[1]],
-                    action: Action {
-                        output_keys: o
-                            .iter()
-                            .flat_map(|key| [KeyInput::press(*key), KeyInput::release(*key)])
-                            .collect(),
-                        transition: *t,
-                        input_canceler: i.iter().copied().map(KeyInput::release).collect(),
-                    },
+                    output_keys: o
+                        .iter()
+                        .flat_map(|key| [KeyInput::press(*key), KeyInput::release(*key)])
+                        .collect(),
+                    transition: *t,
                 })
             })
             .chain(
@@ -342,11 +342,8 @@ fn mk_config() -> KeyConfig {
                         cs.iter().map(move |c| PairHotkeyEntry {
                             cond: *c,
                             input: *i,
-                            action: Action {
-                                output_keys: o.clone(),
-                                transition: *t,
-                                input_canceler: i.iter().copied().map(KeyInput::release).collect(),
-                            },
+                            output_keys: o.clone(),
+                            transition: *t,
                         })
                     }),
             )
