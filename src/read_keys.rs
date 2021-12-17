@@ -2,6 +2,7 @@ use crate::write_keys;
 use evdev::{Device, Key};
 use smallbitset::Set64;
 use std::collections::{BTreeSet, HashMap, HashSet};
+use std::fmt;
 use std::time::SystemTime;
 use std::{
     sync::mpsc::{channel, Sender},
@@ -18,7 +19,7 @@ pub enum TransitionOp {
 
 pub type Transition = Vec<TransitionOp>;
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+#[derive(PartialEq, Eq, Hash, Clone)]
 pub struct PairHotkeyEntry {
     pub cond: State,
     pub input: [Key; 2],
@@ -75,7 +76,7 @@ impl From<i32> for KeyInputKindWithRepeat {
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
 pub struct KeyInputWithRepeat(pub Key, pub KeyInputKindWithRepeat);
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+#[derive(PartialEq, Eq, Hash, Clone)]
 pub struct SingleHotkeyEntry {
     pub cond: State,
     pub shift_key: Vec<Key>,
@@ -96,10 +97,44 @@ impl From<KeyInputWithRepeat> for KeyInput {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct KeyConfig {
     pub pair_hotkeys: Vec<PairHotkeyEntry>,
     pub single_hotkeys: Vec<SingleHotkeyEntry>,
+}
+
+impl fmt::Debug for KeyConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "pair_hotkeys: ")?;
+        for e in &self.pair_hotkeys {
+            writeln!(f, "    {:?}", e)?;
+        }
+        write!(f, "single_hotkeys: ")?;
+        for e in &self.single_hotkeys {
+            write!(f, "\n    {:?}", e)?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Debug for PairHotkeyEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{:?}, {:?}, {:?}, {:?}",
+            self.cond, self.input, self.output_keys, self.transition
+        )
+    }
+}
+
+impl fmt::Debug for SingleHotkeyEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{:?}, {:?}, {:?}, {:?}, {:?}",
+            self.cond, self.input, self.output, self.transition, self.input_canceler
+        )
+    }
 }
 
 type KeyEv = (Key, SystemTime);
