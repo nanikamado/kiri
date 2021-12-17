@@ -12,3 +12,4 @@ log = "0.4.14"
 env_logger = "0.9.0"
 evdev = "0.11.3"
 evdev-keys = { path = "../evdev-keys" }
+smallbitset = { path = "../smallbitset" }
