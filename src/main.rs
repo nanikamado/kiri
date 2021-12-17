@@ -343,6 +343,26 @@ fn mk_config() -> KeyConfig {
                 KeyInput::release(KEY_LEFTSHIFT),
             ],
         ),
+        (
+            &[&[]],
+            [KEY_I, KEY_O],
+            vec![
+                KeyInput::press(KEY_LEFTSHIFT),
+                KeyInput::press(KEY_7),
+                KeyInput::release(KEY_7),
+                KeyInput::release(KEY_LEFTSHIFT),
+            ],
+        ),
+        (
+            &[&[]],
+            [KEY_W, KEY_E],
+            vec![
+                KeyInput::press(KEY_LEFTSHIFT),
+                KeyInput::press(KEY_2),
+                KeyInput::release(KEY_2),
+                KeyInput::release(KEY_LEFTSHIFT),
+            ],
+        ),
         // (
         //     &[0],
         //     [KEY_F, KEY_J],
