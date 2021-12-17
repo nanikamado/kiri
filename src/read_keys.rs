@@ -79,7 +79,6 @@ pub struct KeyInputWithRepeat(pub Key, pub KeyInputKindWithRepeat);
 #[derive(PartialEq, Eq, Hash, Clone)]
 pub struct SingleHotkeyEntry {
     pub cond: State,
-    pub shift_key: Vec<Key>,
     pub input: KeyInput,
     pub output: Vec<KeyInput>,
     pub transition: Transition,
@@ -383,7 +382,6 @@ impl KeyRecorder {
                 .map(
                     |SingleHotkeyEntry {
                          cond,
-                         shift_key: _,
                          input,
                          output,
                          transition,

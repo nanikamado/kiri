@@ -342,7 +342,6 @@ fn mk_config() -> KeyConfig {
             ]
             .map(|(c, i, t)| SingleHotkeyEntry {
                 cond: c.into_iter().collect(),
-                shift_key: Vec::new(),
                 input: i,
                 output: vec![i],
                 transition: vec![t],
@@ -384,7 +383,6 @@ fn mk_config() -> KeyConfig {
             .flat_map(|(cs, i, o, t)| {
                 cs.iter().map(move |c| SingleHotkeyEntry {
                     cond: c.iter().copied().collect(),
-                    shift_key: Vec::new(),
                     input: KeyInput::press(i[0]),
                     output: (*o)
                         .iter()
@@ -397,7 +395,6 @@ fn mk_config() -> KeyConfig {
             .chain(single_keys_with_modifires.iter().flat_map(|(cs, i, o, t)| {
                 cs.iter().map(move |c| SingleHotkeyEntry {
                     cond: c.iter().copied().collect(),
-                    shift_key: Vec::new(),
                     input: *i,
                     output: o.clone(),
                     transition: t.to_vec(),
@@ -407,7 +404,6 @@ fn mk_config() -> KeyConfig {
             .chain(capslock_side.iter().flat_map(|(input, output)| {
                 [vec![2], vec![2, 3]].map(|c| SingleHotkeyEntry {
                     cond: c.iter().copied().collect(),
-                    shift_key: Vec::new(),
                     input: KeyInput::press(*input),
                     output: (*output)
                         .iter()
