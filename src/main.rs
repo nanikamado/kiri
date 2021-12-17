@@ -225,6 +225,38 @@ fn mk_config() -> KeyConfig {
             &[Remove(3)],
             &[],
         ),
+        (
+            &[&[]],
+            KeyInput::press(KEY_SPACE),
+            vec![KeyInput::press(KEY_LEFTSHIFT)],
+            &[Insert(4)],
+            &[],
+        ),
+        (
+            &[&[4], &[5]],
+            KeyInput::press(KEY_SPACE),
+            Vec::new(),
+            &[],
+            &[],
+        ),
+        (
+            &[&[4]],
+            KeyInput::release(KEY_SPACE),
+            vec![
+                KeyInput::release(KEY_LEFTSHIFT),
+                KeyInput::press(KEY_SPACE),
+                KeyInput::release(KEY_SPACE),
+            ],
+            &[Remove(4)],
+            &[],
+        ),
+        (
+            &[&[5]],
+            KeyInput::release(KEY_SPACE),
+            vec![KeyInput::release(KEY_LEFTSHIFT)],
+            &[Remove(5)],
+            &[],
+        ),
     ];
     let capslock_side: &[(Key, Vec<_>)] = &[
         (KEY_I, vec![KEY_UP]),
@@ -364,6 +396,17 @@ fn mk_config() -> KeyConfig {
             })
         })
         .collect::<Vec<_>>();
+    let all_alphabet_keys = &[
+        KEY_A, KEY_B, KEY_C, KEY_D, KEY_E, KEY_F, KEY_G, KEY_H, KEY_I, KEY_J, KEY_K, KEY_L, KEY_M,
+        KEY_N, KEY_O, KEY_P, KEY_Q, KEY_R, KEY_S, KEY_T, KEY_U, KEY_V, KEY_W, KEY_X, KEY_Y, KEY_Z,
+    ];
+    let sands_config = all_alphabet_keys.iter().map(|k| SingleHotkeyEntry {
+        cond: smallbitset::Set64::singleton(4),
+        input: KeyInput::press(*k),
+        output: vec![KeyInput::press(*k)],
+        transition: vec![Remove(4), Insert(5)],
+        input_canceler: Vec::new(),
+    });
     KeyConfig {
         pair_hotkeys: key_config_r
             .iter()
@@ -433,6 +476,7 @@ fn mk_config() -> KeyConfig {
                 })
             }))
             .chain(modifiers_trans)
+            .chain(sands_config)
             .collect(),
     }
 }
