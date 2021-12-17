@@ -259,18 +259,8 @@ fn send_key_handler<'a>(
     state: &mut State,
     input_canceler: &mut HashSet<KeyInput>,
     pressing_pair: &mut PressingPair<'a>,
-    pressing_keys: &mut HashSet<Key>,
     tx: &Sender<KeyRecorderBehavior>,
 ) {
-    match key.0 {
-        KeyInputWithRepeat(key_name, KeyInputKindWithRepeat::Press) => {
-            pressing_keys.insert(key_name);
-        }
-        KeyInputWithRepeat(key_name, KeyInputKindWithRepeat::Release) => {
-            pressing_keys.remove(&key_name);
-        }
-        _ => (),
-    }
     if !input_canceler.remove(&key.0.into()) {
         match key {
             (KeyInputWithRepeat(key_name, KeyInputKindWithRepeat::Press), time)
@@ -404,7 +394,6 @@ impl KeyRecorder {
             let mut input_canceler: HashSet<KeyInput> = HashSet::new();
             let mut waiting_key: Option<KeyEv> = None;
             let mut pressing_pair: PressingPair = Default::default();
-            let mut pressing_keys: HashSet<Key> = HashSet::new();
             for received in rx {
                 match received {
                     KeyRecorderBehavior::FireSpecificWaitingKey(key) => {
@@ -427,7 +416,6 @@ impl KeyRecorder {
                         &mut state,
                         &mut input_canceler,
                         &mut pressing_pair,
-                        &mut pressing_keys,
                         &tx_clone,
                     ),
                 }
