@@ -221,7 +221,10 @@ fn mk_config() -> KeyConfig {
         (
             &[&[3]],
             KeyInput::release(KEY_CAPSLOCK),
-            Vec::new(),
+            vec![
+                KeyInput::release(KEY_LEFTCTRL),
+                KeyInput::release(KEY_LEFTSHIFT),
+            ],
             &[Remove(3)],
             &[],
         ),
@@ -263,6 +266,18 @@ fn mk_config() -> KeyConfig {
         (KEY_J, vec![KEY_LEFT]),
         (KEY_K, vec![KEY_DOWN]),
         (KEY_L, vec![KEY_RIGHT]),
+    ];
+    let capslock_midifiers: &[(KeyInput, Vec<KeyInput>)] = &[
+        (KeyInput::press(KEY_F), vec![KeyInput::press(KEY_LEFTSHIFT)]),
+        (KeyInput::press(KEY_E), vec![KeyInput::press(KEY_LEFTCTRL)]),
+        (
+            KeyInput::release(KEY_F),
+            vec![KeyInput::release(KEY_LEFTSHIFT)],
+        ),
+        (
+            KeyInput::release(KEY_E),
+            vec![KeyInput::release(KEY_LEFTCTRL)],
+        ),
     ];
     let pair_keys_with_modifiers_config: &[(&[&[u8]], [Key; 2], Vec<_>)] = &[
         (
@@ -493,6 +508,15 @@ fn mk_config() -> KeyConfig {
                         .collect::<Vec<_>>(),
                     transition: vec![Remove(2), Insert(3)],
                     input_canceler: vec![KeyInput::release(*input)],
+                })
+            }))
+            .chain(capslock_midifiers.iter().flat_map(|(i, o)| {
+                [vec![2], vec![3]].map(|c| SingleHotkeyEntry {
+                    cond: c.iter().copied().collect(),
+                    input: *i,
+                    output: o.to_vec(),
+                    transition: vec![Remove(2), Insert(3)],
+                    input_canceler: Vec::new(),
                 })
             }))
             .chain(modifiers_trans)
