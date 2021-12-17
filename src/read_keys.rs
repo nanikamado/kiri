@@ -337,6 +337,8 @@ fn send_key_handler<'a>(
                 }
             }
         };
+    } else {
+        log::debug!("input {:?} canceled", key.0);
     }
 }
 

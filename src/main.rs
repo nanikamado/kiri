@@ -8,12 +8,16 @@ mod write_keys;
 
 fn mk_config() -> KeyConfig {
     use TransitionOp::*;
-    let all_states: &[&[u8]] = &[&[], &[0], &[0, 1], &[2], &[0, 2], &[0, 1, 2]];
+    let all_states: &[&[u8]] = &[&[], &[0], &[1], &[2], &[3], &[4], &[5]];
     // []  : normal
-    // [0] : jp input
-    // [0, 1] : jp input with modifiers
-    // [2], [0, 2], [0, 1, 2] : capslock
-    // 3 : other key pressed while capslock is on
+    // 0   : jp input
+    // 1   : jp input with modifiers
+    // 2   : capslock plessing, move to jp after release
+    // 3   : other key pressed while capslock is on,
+    //       or capslock plessing after jp, so move to []
+    //       after release
+    // 4   : space is pressing
+    // 5   : other key pressed while space is pressed
     let key_config_r: &[(&[&[u8]], &[Key], &[Key], &[TransitionOp])] = &[
         (all_states, &[KEY_HENKAN], &[KEY_ENTER], &[]),
         (all_states, &[KEY_MUHENKAN], &[KEY_BACKSPACE], &[]),
@@ -171,12 +175,35 @@ fn mk_config() -> KeyConfig {
         (&[&[]], &[KEY_F, KEY_SEMICOLON], &[KEY_END], &[]),
         (&[&[]], &[KEY_A, KEY_J], &[KEY_HOME], &[]),
     ];
-    let single_keys_with_modifires: &[(&[&[u8]], KeyInput, Vec<_>, &[TransitionOp])] = &[
+    let single_keys_with_modifires: &[(
+        &[&[u8]],
+        KeyInput,
+        Vec<_>,
+        &[TransitionOp],
+        &[KeyInput],
+    )] = &[
         (
-            &[&[], &[0]],
+            &[&[]],
             KeyInput::press(KEY_CAPSLOCK),
             Vec::new(),
             &[Insert(2)],
+            &[],
+        ),
+        (
+            &[&[0]],
+            KeyInput::press(KEY_CAPSLOCK),
+            vec![
+                KeyInput::press(KEY_LEFTCTRL),
+                KeyInput::press(KEY_RIGHTBRACE),
+                KeyInput::release(KEY_RIGHTBRACE),
+                KeyInput::release(KEY_LEFTCTRL),
+                KeyInput::press(KEY_LEFTMETA),
+                KeyInput::press(KEY_SPACE),
+                KeyInput::release(KEY_SPACE),
+                KeyInput::release(KEY_LEFTMETA),
+            ],
+            &[Remove(0), Insert(3)],
+            &[],
         ),
         (
             &[&[2]],
@@ -188,27 +215,15 @@ fn mk_config() -> KeyConfig {
                 KeyInput::release(KEY_LEFTMETA),
             ],
             &[Insert(0), Remove(2)],
+            &[],
         ),
+        (&[&[2]], KeyInput::press(KEY_CAPSLOCK), Vec::new(), &[], &[]),
         (
-            &[&[2, 0]],
-            KeyInput::release(KEY_CAPSLOCK),
-            vec![
-                KeyInput::press(KEY_LEFTCTRL),
-                KeyInput::press(KEY_RIGHTBRACE),
-                KeyInput::release(KEY_RIGHTBRACE),
-                KeyInput::release(KEY_LEFTCTRL),
-                KeyInput::press(KEY_LEFTMETA),
-                KeyInput::press(KEY_SPACE),
-                KeyInput::release(KEY_SPACE),
-                KeyInput::release(KEY_LEFTMETA),
-            ],
-            &[Remove(0), Remove(2)],
-        ),
-        (
-            &[&[2, 3]],
+            &[&[3]],
             KeyInput::release(KEY_CAPSLOCK),
             Vec::new(),
-            &[Remove(2), Remove(3)],
+            &[Remove(3)],
+            &[],
         ),
     ];
     let capslock_side: &[(Key, Vec<_>)] = &[
@@ -337,14 +352,14 @@ fn mk_config() -> KeyConfig {
         .iter()
         .flat_map(|key| {
             [
-                (vec![0], KeyInput::press(*key), TransitionOp::Insert(2)),
-                (vec![0, 1], KeyInput::release(*key), TransitionOp::Remove(2)),
+                (vec![0], KeyInput::press(*key), &[Remove(0), Insert(1)]),
+                (vec![1], KeyInput::release(*key), &[Insert(0), Remove(1)]),
             ]
             .map(|(c, i, t)| SingleHotkeyEntry {
                 cond: c.into_iter().collect(),
                 input: i,
                 output: vec![i],
-                transition: vec![t],
+                transition: t.to_vec(),
                 input_canceler: Vec::new(),
             })
         })
@@ -392,24 +407,28 @@ fn mk_config() -> KeyConfig {
                     input_canceler: vec![KeyInput::release(i[0])],
                 })
             })
-            .chain(single_keys_with_modifires.iter().flat_map(|(cs, i, o, t)| {
-                cs.iter().map(move |c| SingleHotkeyEntry {
-                    cond: c.iter().copied().collect(),
-                    input: *i,
-                    output: o.clone(),
-                    transition: t.to_vec(),
-                    input_canceler: Vec::new(),
-                })
-            }))
+            .chain(
+                single_keys_with_modifires
+                    .iter()
+                    .flat_map(|(cs, i, o, t, canceler)| {
+                        cs.iter().map(move |c| SingleHotkeyEntry {
+                            cond: c.iter().copied().collect(),
+                            input: *i,
+                            output: o.clone(),
+                            transition: t.to_vec(),
+                            input_canceler: canceler.to_vec(),
+                        })
+                    }),
+            )
             .chain(capslock_side.iter().flat_map(|(input, output)| {
-                [vec![2], vec![2, 3]].map(|c| SingleHotkeyEntry {
+                [vec![2], vec![3]].map(|c| SingleHotkeyEntry {
                     cond: c.iter().copied().collect(),
                     input: KeyInput::press(*input),
                     output: (*output)
                         .iter()
                         .flat_map(|key| [KeyInput::press(*key), KeyInput::release(*key)])
                         .collect::<Vec<_>>(),
-                    transition: vec![Insert(3)],
+                    transition: vec![Remove(2), Insert(3)],
                     input_canceler: vec![KeyInput::release(*input)],
                 })
             }))
