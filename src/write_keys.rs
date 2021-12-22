@@ -10,11 +10,15 @@ pub struct KeyWriter {
 
 impl KeyWriter {
     pub fn new(d: &Device) -> KeyWriter {
+        let mut key_set = evdev::AttributeSet::<evdev::Key>::new();
+        evdev_keys::all_keys().for_each(|key| {
+            key_set.insert(key);
+        });
         KeyWriter {
             device: VirtualDeviceBuilder::new()
                 .unwrap()
                 .name(b"kiri virtual keyboard")
-                .with_keys(d.supported_keys().unwrap())
+                .with_keys(&key_set)
                 .unwrap()
                 .input_id(d.input_id())
                 .build()
