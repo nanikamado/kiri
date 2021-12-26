@@ -90,12 +90,12 @@ impl From<KeyInputWithRepeat> for KeyInput {
 }
 
 #[derive(PartialEq, Eq, Clone)]
-pub struct KeyConfig {
+pub struct KeyConfigUnit {
     pub pair_hotkeys: Vec<PairHotkeyEntry>,
     pub single_hotkeys: Vec<SingleHotkeyEntry>,
 }
 
-impl fmt::Debug for KeyConfig {
+impl fmt::Debug for KeyConfigUnit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "pair_hotkeys: ")?;
         for e in &self.pair_hotkeys {
@@ -317,7 +317,7 @@ fn send_key_handler<'a>(
 }
 
 impl KeyRecorder {
-    pub fn new(d: &Device, key_config: KeyConfig) -> KeyRecorder {
+    pub fn new(key_config: KeyConfigUnit) -> KeyRecorder {
         let (tx, rx) = channel();
         let tx_clone = tx.clone();
         let mut key_writer = write_keys::KeyWriter::new();

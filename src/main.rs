@@ -1,12 +1,12 @@
 use evdev::Key;
 use evdev_keys::*;
-use read_keys::{KeyConfig, KeyInput, PairHotkeyEntry, SingleHotkeyEntry, State, Transition};
+use read_keys::{KeyConfigUnit, KeyInput, PairHotkeyEntry, SingleHotkeyEntry, State, Transition};
 
 mod read_events;
 mod read_keys;
 mod write_keys;
 
-fn mk_config() -> KeyConfig {
+fn mk_config() -> KeyConfigUnit {
     // 0  : normal
     // 7   : jp input
     // 1   : jp input with modifiers
@@ -454,7 +454,7 @@ fn mk_config() -> KeyConfig {
         transition: Some(5),
         input_canceler: Vec::new(),
     });
-    KeyConfig {
+    KeyConfigUnit {
         pair_hotkeys: key_config_r
             .iter()
             .filter(|(_, i, _, _)| i.len() == 2)
