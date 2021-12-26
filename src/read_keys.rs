@@ -1,6 +1,5 @@
 use crate::write_keys;
 use evdev::{Device, Key};
-use smallbitset::Set64;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt;
 use std::time::SystemTime;
@@ -9,22 +8,16 @@ use std::{
     thread, time,
 };
 
-pub type State = Set64;
+pub type State = u64;
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
-pub enum TransitionOp {
-    Insert(u8),
-    Remove(u8),
-}
-
-pub type Transition = Vec<TransitionOp>;
+pub type Transition = u64;
 
 #[derive(PartialEq, Eq, Hash, Clone)]
 pub struct PairHotkeyEntry {
     pub cond: State,
     pub input: [Key; 2],
     pub output_keys: Vec<KeyInput>,
-    pub transition: Transition,
+    pub transition: Option<Transition>,
 }
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
@@ -81,7 +74,7 @@ pub struct SingleHotkeyEntry {
     pub cond: State,
     pub input: KeyInput,
     pub output: Vec<KeyInput>,
-    pub transition: Transition,
+    pub transition: Option<Transition>,
     pub input_canceler: Vec<KeyInput>,
 }
 
@@ -159,7 +152,7 @@ pub struct KeyRecorder {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Action {
     pub output_keys: Vec<KeyInput>,
-    pub transition: Transition,
+    pub transition: Option<Transition>,
     pub input_canceler: Vec<KeyInput>,
 }
 
@@ -178,18 +171,9 @@ fn perform_action(
     for output_key in &action.output_keys {
         key_writer.fire_key_input(*output_key);
     }
-    for op in &action.transition {
-        match op {
-            TransitionOp::Insert(e) => {
-                *state = state.insert(*e);
-            }
-            TransitionOp::Remove(e) => {
-                *state = state.remove(*e);
-            }
-        }
-    }
-    if !action.transition.is_empty() {
-        log::debug!("state : {:?}", *state);
+    if let Some(t) = action.transition {
+        log::debug!("state : {} -> {}", *state, t);
+        *state = t;
     }
     for c in &action.input_canceler {
         input_canceler.insert(*c);
@@ -337,7 +321,7 @@ impl KeyRecorder {
         let (tx, rx) = channel();
         let tx_clone = tx.clone();
         let mut key_writer = write_keys::KeyWriter::new(d);
-        let mut state = Set64::empty();
+        let mut state = 0;
         log::debug!("{:?}", key_config);
         thread::spawn(move || {
             let pair_input_keys: HashSet<(Key, State)> = key_config
