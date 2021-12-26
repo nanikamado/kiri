@@ -38,7 +38,7 @@ pub fn run(config: KeyConfig) {
         eprintln!("keyboard not found");
         exit(1);
     }
-    let key_recorder = KeyRecorder::new(&keyboards[0], config.clone());
+    let key_recorder = KeyRecorder::new(config.clone());
     log::info!("config loaded");
     for input_event in make_read_channel(keyboards.into_iter()) {
         log::debug!("{:?}", input_event.kind());

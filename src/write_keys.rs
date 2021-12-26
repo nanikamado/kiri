@@ -1,15 +1,15 @@
+use crate::read_keys::KeyInput;
 use evdev::{
     uinput::{VirtualDevice, VirtualDeviceBuilder},
-    Device, EventType, InputEvent,
+    EventType, InputEvent,
 };
-use crate::read_keys::KeyInput;
 
 pub struct KeyWriter {
     device: VirtualDevice,
 }
 
 impl KeyWriter {
-    pub fn new(d: &Device) -> KeyWriter {
+    pub fn new() -> KeyWriter {
         let mut key_set = evdev::AttributeSet::<evdev::Key>::new();
         evdev_keys::all_keys().for_each(|key| {
             key_set.insert(key);
@@ -20,7 +20,6 @@ impl KeyWriter {
                 .name(b"kiri virtual keyboard")
                 .with_keys(&key_set)
                 .unwrap()
-                .input_id(d.input_id())
                 .build()
                 .unwrap(),
         }

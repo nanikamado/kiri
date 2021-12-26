@@ -1,5 +1,5 @@
 use crate::write_keys;
-use evdev::{Device, Key};
+use evdev::Key;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt;
 use std::time::SystemTime;
@@ -320,7 +320,7 @@ impl KeyRecorder {
     pub fn new(d: &Device, key_config: KeyConfig) -> KeyRecorder {
         let (tx, rx) = channel();
         let tx_clone = tx.clone();
-        let mut key_writer = write_keys::KeyWriter::new(d);
+        let mut key_writer = write_keys::KeyWriter::new();
         let mut state = 0;
         log::debug!("{:?}", key_config);
         thread::spawn(move || {
