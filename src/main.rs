@@ -18,6 +18,7 @@ fn mk_config() -> KeyConfig {
     //       after release
     // 4   : space is pressing
     // 5   : other key pressed while space is pressed
+    // 6   : foot pedal
     let key_config_r: &[(&[&[u8]], &[Key], &[Key], &[TransitionOp])] = &[
         (all_states, &[KEY_HENKAN], &[KEY_ENTER], &[]),
         (all_states, &[KEY_MUHENKAN], &[KEY_BACKSPACE], &[]),
@@ -149,7 +150,7 @@ fn mk_config() -> KeyConfig {
         (&[&[0]], &[KEY_S, KEY_U], &[KEY_P, KEY_E], &[]),
         (&[&[0]], &[KEY_S, KEY_I], &[KEY_D, KEY_O], &[]),
         (&[&[0]], &[KEY_S, KEY_O], &[KEY_Y, KEY_A], &[]),
-        (&[&[0]], &[KEY_S, KEY_P], &[KEY_S, KEY_Y, KEY_E], &[]),
+        (&[&[0]], &[KEY_S, KEY_P], &[KEY_J, KEY_E], &[]),
         (&[&[0]], &[KEY_Y], &[KEY_G, KEY_U], &[]),
         (&[&[0]], &[KEY_U], &[KEY_B, KEY_A], &[]),
         (&[&[0]], &[KEY_I], &[KEY_K, KEY_O], &[]),
@@ -258,6 +259,15 @@ fn mk_config() -> KeyConfig {
             KeyInput::release(KEY_SPACE),
             vec![KeyInput::release(KEY_LEFTSHIFT)],
             &[Remove(5)],
+            &[],
+        ),
+        (&[&[]], KeyInput::press(KEY_F21), vec![], &[Insert(6)], &[]),
+        (&[&[6]], KeyInput::press(KEY_F21), vec![], &[], &[]),
+        (
+            &[&[6]],
+            KeyInput::release(KEY_F21),
+            vec![],
+            &[Remove(6)],
             &[],
         ),
     ];
@@ -509,6 +519,18 @@ fn mk_config() -> KeyConfig {
                     transition: vec![Remove(2), Insert(3)],
                     input_canceler: vec![KeyInput::release(*input)],
                 })
+            }))
+            .chain(capslock_side.iter().map(|(input, output)| {
+                SingleHotkeyEntry {
+                    cond: [6].iter().copied().collect(),
+                    input: KeyInput::press(*input),
+                    output: (*output)
+                        .iter()
+                        .flat_map(|key| [KeyInput::press(*key), KeyInput::release(*key)])
+                        .collect::<Vec<_>>(),
+                    transition: vec![],
+                    input_canceler: vec![KeyInput::release(*input)],
+                }
             }))
             .chain(capslock_midifiers.iter().flat_map(|(i, o)| {
                 [vec![2], vec![3]].map(|c| SingleHotkeyEntry {
