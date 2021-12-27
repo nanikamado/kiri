@@ -235,7 +235,8 @@ fn fire_waiting_key(
 
 fn send_key_handler<'a>(
     waiting_key: &mut Option<(Key, SystemTime)>,
-    key: (KeyInputWithRepeat, SystemTime),
+    key: KeyInputWithRepeat,
+    time: SystemTime,
     pair_hotkeys_map: &'a HashMap<(BTreeSet<Key>, State), Action>,
     key_writer: &mut write_keys::KeyWriter,
     pair_input_keys: &HashSet<(Key, State)>,
@@ -245,9 +246,9 @@ fn send_key_handler<'a>(
     pressing_pair: &mut PressingPair<'a>,
     tx: &Sender<KeyRecorderBehavior>,
 ) {
-    if !input_canceler.remove(&key.0.into()) {
+    if !input_canceler.remove(&key.into()) {
         match key {
-            (KeyInputWithRepeat(key_name, KeyInputKindWithRepeat::Press), time)
+            KeyInputWithRepeat(key_name, KeyInputKindWithRepeat::Press)
                 if pair_input_keys.contains(&(key_name, state.clone())) =>
             {
                 match *waiting_key {
@@ -282,7 +283,7 @@ fn send_key_handler<'a>(
                     }
                 }
             }
-            (KeyInputWithRepeat(key_name, KeyInputKindWithRepeat::Repeat), _)
+            KeyInputWithRepeat(key_name, KeyInputKindWithRepeat::Repeat)
                 if pressing_pair.pair.contains(&key_name) =>
             {
                 perform_action(
@@ -293,7 +294,7 @@ fn send_key_handler<'a>(
                 );
             }
             _ => {
-                if !pressing_pair.pair.remove(&key.0 .0) {
+                if !pressing_pair.pair.remove(&key.0) {
                     fire_waiting_key(
                         waiting_key,
                         single_hotkeys_map,
@@ -302,7 +303,7 @@ fn send_key_handler<'a>(
                         input_canceler,
                     );
                     fire_key_input(
-                        key.0.into(),
+                        key.into(),
                         single_hotkeys_map,
                         key_writer,
                         state,
@@ -390,9 +391,10 @@ impl KeyRecorder {
                             &mut input_canceler,
                         )
                     }
-                    KeyRecorderBehavior::SendKey(key) => send_key_handler(
+                    KeyRecorderBehavior::SendKey((key, time)) => send_key_handler(
                         &mut waiting_key,
                         key,
+                        time,
                         &pair_hotkeys_map,
                         &mut key_writer,
                         &pair_input_keys,
