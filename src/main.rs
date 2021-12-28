@@ -550,5 +550,5 @@ fn mk_config() -> KeyConfigUnit {
 }
 
 fn main() {
-    read_events::run(mk_config());
+    read_events::run(vec![mk_config()]);
 }

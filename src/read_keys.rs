@@ -1,4 +1,4 @@
-use crate::write_keys;
+use crate::write_keys::{self, KeyWriter};
 use evdev::Key;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt;
@@ -89,6 +89,15 @@ impl From<KeyInputWithRepeat> for KeyInput {
     }
 }
 
+impl From<KeyInput> for KeyInputWithRepeat {
+    fn from(KeyInput(name, kind): KeyInput) -> Self {
+        match kind {
+            KeyInputKind::Press => Self(name, KeyInputKindWithRepeat::Press),
+            KeyInputKind::Release => Self(name, KeyInputKindWithRepeat::Release),
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Clone)]
 pub struct KeyConfigUnit {
     pub pair_hotkeys: Vec<PairHotkeyEntry>,
@@ -145,7 +154,7 @@ fn fire_waiting_key_delay(key: (Key, SystemTime), tx: Sender<KeyRecorderBehavior
     });
 }
 
-pub struct KeyRecorder {
+pub struct KeyRecorderUnit {
     tx: Sender<KeyRecorderBehavior>,
 }
 
@@ -162,14 +171,19 @@ pub struct PressingPair<'a> {
     pub action: Option<&'a Action>,
 }
 
+trait KeyReceiver: Send {
+    fn send_key(&mut self, key: KeyInputWithRepeat, time: SystemTime);
+}
+
 fn perform_action(
     action: &Action,
-    key_writer: &mut write_keys::KeyWriter,
+    time: SystemTime,
+    key_receiver: &mut impl KeyReceiver,
     state: &mut State,
     input_canceler: &mut HashSet<KeyInput>,
 ) {
     for output_key in &action.output_keys {
-        key_writer.fire_key_input(*output_key);
+        key_receiver.send_key((*output_key).into(), time);
     }
     if let Some(t) = action.transition {
         log::debug!("state : {} -> {}", *state, t);
@@ -182,32 +196,35 @@ fn perform_action(
 
 fn fire_key_input(
     key: KeyInput,
+    time: SystemTime,
     single_hotkeys: &HashMap<(KeyInput, State), Action>,
-    key_writer: &mut write_keys::KeyWriter,
+    key_receiver: &mut impl KeyReceiver,
     state: &mut State,
     input_canceler: &mut HashSet<KeyInput>,
 ) {
     if let Some(action) = single_hotkeys.get(&(key, state.clone())) {
-        perform_action(action, key_writer, state, input_canceler);
+        perform_action(action, time, key_receiver, state, input_canceler);
     } else {
-        key_writer.fire_key_input(key);
+        key_receiver.send_key(key.into(), time);
     }
 }
 
 fn fire_specific_waiting_key_handler(
     waiting_key: &mut Option<(Key, SystemTime)>,
-    key: (Key, SystemTime),
+    key: Key,
+    time: SystemTime,
     single_hotkeys: &HashMap<(KeyInput, State), Action>,
-    key_writer: &mut write_keys::KeyWriter,
+    key_receiver: &mut impl KeyReceiver,
     state: &mut State,
     input_canceler: &mut HashSet<KeyInput>,
 ) {
-    if Some(key) == *waiting_key {
+    if Some((key, time)) == *waiting_key {
         *waiting_key = None;
         fire_key_input(
-            KeyInput::press(key.0),
+            KeyInput::press(key),
+            time,
             single_hotkeys,
-            key_writer,
+            key_receiver,
             state,
             input_canceler,
         );
@@ -217,16 +234,17 @@ fn fire_specific_waiting_key_handler(
 fn fire_waiting_key(
     waiting_key: &mut Option<(Key, SystemTime)>,
     single_hotkeys: &HashMap<(KeyInput, State), Action>,
-    key_writer: &mut write_keys::KeyWriter,
+    key_receiver: &mut impl KeyReceiver,
     state: &mut State,
     input_canceler: &mut HashSet<KeyInput>,
 ) {
-    if let Some((key, _)) = *waiting_key {
+    if let Some((key, time)) = *waiting_key {
         *waiting_key = None;
         fire_key_input(
             KeyInput::press(key),
+            time,
             single_hotkeys,
-            key_writer,
+            key_receiver,
             state,
             input_canceler,
         );
@@ -238,7 +256,7 @@ fn send_key_handler<'a>(
     key: KeyInputWithRepeat,
     time: SystemTime,
     pair_hotkeys_map: &'a HashMap<(BTreeSet<Key>, State), Action>,
-    key_writer: &mut write_keys::KeyWriter,
+    key_receiver: &mut impl KeyReceiver,
     pair_input_keys: &HashSet<(Key, State)>,
     single_hotkeys_map: &HashMap<(KeyInput, State), Action>,
     state: &mut State,
@@ -263,13 +281,14 @@ fn send_key_handler<'a>(
                                 pair: key_set,
                                 action: Some(action),
                             };
-                            perform_action(action, key_writer, state, input_canceler);
+                            perform_action(action, time, key_receiver, state, input_canceler);
                             return;
                         } else {
                             fire_key_input(
                                 KeyInput::press(waiting_key_kind),
+                                time,
                                 single_hotkeys_map,
-                                key_writer,
+                                key_receiver,
                                 state,
                                 input_canceler,
                             );
@@ -288,7 +307,8 @@ fn send_key_handler<'a>(
             {
                 perform_action(
                     &pressing_pair.action.unwrap(),
-                    key_writer,
+                    time,
+                    key_receiver,
                     state,
                     input_canceler,
                 );
@@ -298,14 +318,15 @@ fn send_key_handler<'a>(
                     fire_waiting_key(
                         waiting_key,
                         single_hotkeys_map,
-                        key_writer,
+                        key_receiver,
                         state,
                         input_canceler,
                     );
                     fire_key_input(
                         key.into(),
+                        time,
                         single_hotkeys_map,
-                        key_writer,
+                        key_receiver,
                         state,
                         input_canceler,
                     );
@@ -317,11 +338,13 @@ fn send_key_handler<'a>(
     }
 }
 
-impl KeyRecorder {
-    pub fn new(key_config: KeyConfigUnit) -> KeyRecorder {
+impl KeyRecorderUnit {
+    fn new(
+        key_config: KeyConfigUnit,
+        mut key_receiver: impl KeyReceiver + 'static,
+    ) -> KeyRecorderUnit {
         let (tx, rx) = channel();
         let tx_clone = tx.clone();
-        let mut key_writer = write_keys::KeyWriter::new();
         let mut state = 0;
         log::debug!("{:?}", key_config);
         thread::spawn(move || {
@@ -381,12 +404,13 @@ impl KeyRecorder {
             let mut pressing_pair: PressingPair = Default::default();
             for received in rx {
                 match received {
-                    KeyRecorderBehavior::FireSpecificWaitingKey(key) => {
+                    KeyRecorderBehavior::FireSpecificWaitingKey((key, time)) => {
                         fire_specific_waiting_key_handler(
                             &mut waiting_key,
                             key,
+                            time,
                             &single_hotkeys_map,
-                            &mut key_writer,
+                            &mut key_receiver,
                             &mut state,
                             &mut input_canceler,
                         )
@@ -396,7 +420,7 @@ impl KeyRecorder {
                         key,
                         time,
                         &pair_hotkeys_map,
-                        &mut key_writer,
+                        &mut key_receiver,
                         &pair_input_keys,
                         &single_hotkeys_map,
                         &mut state,
@@ -407,12 +431,44 @@ impl KeyRecorder {
                 }
             }
         });
-        KeyRecorder { tx }
+        KeyRecorderUnit { tx }
     }
+}
 
-    pub fn send_key(&self, key: KeyInputWithRepeat, time: SystemTime) {
+impl KeyReceiver for KeyRecorderUnit {
+    fn send_key(&mut self, key: KeyInputWithRepeat, time: SystemTime) {
         self.tx
             .send(KeyRecorderBehavior::SendKey((key, time)))
             .unwrap();
+    }
+}
+
+impl KeyReceiver for KeyWriter {
+    fn send_key(&mut self, key: KeyInputWithRepeat, _: SystemTime) {
+        self.fire_key_input(key.into());
+    }
+}
+
+pub struct KeyRecorder {
+    first_recorder: KeyRecorderUnit,
+}
+
+pub type KeyConfig = Vec<KeyConfigUnit>;
+
+impl KeyRecorder {
+    pub fn new(key_config: KeyConfig) -> Self {
+        let mut key_config = key_config.into_iter().rev();
+        let key_receiver = write_keys::KeyWriter::new();
+        let mut key_receiver = KeyRecorderUnit::new(key_config.next().unwrap(), key_receiver);
+        for conf_unit in key_config {
+            key_receiver = KeyRecorderUnit::new(conf_unit, key_receiver);
+        }
+        KeyRecorder {
+            first_recorder: key_receiver,
+        }
+    }
+
+    pub fn send_key(&mut self, key: KeyInputWithRepeat, time: SystemTime) {
+        self.first_recorder.send_key(key, time);
     }
 }
