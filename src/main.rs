@@ -540,24 +540,48 @@ fn make_config2() -> KeyConfigUnit {
         (KEY_K, KEY_DOWN),
         (KEY_L, KEY_RIGHT),
     ];
-    let capslock_side = capslock_side.iter().map(|(i, o)| SingleHotkeyEntry {
-        cond: 1,
-        input: KeyInput::press(*i),
-        output: vec![KeyInput::press(*o), KeyInput::release(*o)],
-        transition: None,
-        input_canceler: vec![KeyInput::release(*i)],
-    });
-    let single_hotkeys = [
-        (KeyInput::press(KEY_CAPSLOCK), 1),
-        (KeyInput::release(KEY_CAPSLOCK), 0),
-    ];
-    let single_hotkyes = single_hotkeys.iter().flat_map(|(i, t)| {
-        [0, 1].map(|c| SingleHotkeyEntry {
+    let capslock_side = capslock_side.iter().flat_map(|(i, o)| {
+        [1, 2].map(|c| SingleHotkeyEntry {
             cond: c,
-            input: *i,
-            output: Vec::new(),
-            transition: Some(*t),
+            input: KeyInput::press(*i),
+            output: vec![KeyInput::press(*o), KeyInput::release(*o)],
+            transition: None,
             input_canceler: Vec::new(),
+        })
+    });
+    let single_hotkeys: &[(&[State], KeyInput, &[KeyInput], State, &[KeyInput])] = &[
+        (&[0, 1], KeyInput::press(KEY_CAPSLOCK), &[], 1, &[]),
+        (&[2], KeyInput::press(KEY_CAPSLOCK), &[], 2, &[]),
+        (&[0, 1], KeyInput::release(KEY_CAPSLOCK), &[], 0, &[]),
+        (
+            &[2],
+            KeyInput::release(KEY_CAPSLOCK),
+            &[KeyInput::release(KEY_LEFTCTRL)],
+            0,
+            &[KeyInput::release(KEY_E)],
+        ),
+        (
+            &[1, 2],
+            KeyInput::press(KEY_E),
+            &[KeyInput::press(KEY_LEFTCTRL)],
+            2,
+            &[],
+        ),
+        (
+            &[2],
+            KeyInput::release(KEY_E),
+            &[KeyInput::release(KEY_LEFTCTRL)],
+            1,
+            &[],
+        ),
+    ];
+    let single_hotkyes = single_hotkeys.iter().flat_map(|(c, i, o, t, cancel)| {
+        c.iter().map(move |c| SingleHotkeyEntry {
+            cond: *c,
+            input: *i,
+            output: o.to_vec(),
+            transition: Some(*t),
+            input_canceler: cancel.to_vec(),
         })
     });
     KeyConfigUnit {
