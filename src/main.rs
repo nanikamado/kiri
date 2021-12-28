@@ -199,52 +199,6 @@ fn mk_config() -> KeyConfigUnit {
     )] = &[
         (
             &[0],
-            KeyInput::press(KEY_CAPSLOCK),
-            Vec::new(),
-            Some(2),
-            &[],
-        ),
-        (
-            &[7],
-            KeyInput::press(KEY_CAPSLOCK),
-            vec![
-                KeyInput::press(KEY_LEFTCTRL),
-                KeyInput::press(KEY_RIGHTBRACE),
-                KeyInput::release(KEY_RIGHTBRACE),
-                KeyInput::release(KEY_LEFTCTRL),
-                KeyInput::press(KEY_LEFTMETA),
-                KeyInput::press(KEY_SPACE),
-                KeyInput::release(KEY_SPACE),
-                KeyInput::release(KEY_LEFTMETA),
-            ],
-            Some(3),
-            &[],
-        ),
-        (
-            &[2],
-            KeyInput::release(KEY_CAPSLOCK),
-            vec![
-                KeyInput::press(KEY_LEFTMETA),
-                KeyInput::press(KEY_SPACE),
-                KeyInput::release(KEY_SPACE),
-                KeyInput::release(KEY_LEFTMETA),
-            ],
-            Some(7),
-            &[],
-        ),
-        (&[2], KeyInput::press(KEY_CAPSLOCK), Vec::new(), None, &[]),
-        (
-            &[3],
-            KeyInput::release(KEY_CAPSLOCK),
-            vec![
-                KeyInput::release(KEY_LEFTCTRL),
-                KeyInput::release(KEY_LEFTSHIFT),
-            ],
-            Some(0),
-            &[],
-        ),
-        (
-            &[0],
             KeyInput::press(KEY_SPACE),
             vec![KeyInput::press(KEY_LEFTSHIFT)],
             Some(4),
@@ -291,7 +245,7 @@ fn mk_config() -> KeyConfigUnit {
             vec![KeyInput::release(KEY_LEFTCTRL)],
         ),
     ];
-    let pair_keys_with_modifiers_config: &[(&[State], [Key; 2], Vec<_>)] = &[
+    let pair_keys_with_modifiers_config: &[(&[State], [Key; 2], Vec<_>, Option<Transition>)] = &[
         (
             &[0, 7],
             [KEY_J, KEY_N],
@@ -301,6 +255,7 @@ fn mk_config() -> KeyConfigUnit {
                 KeyInput::release(KEY_SLASH),
                 KeyInput::release(KEY_LEFTSHIFT),
             ],
+            None,
         ),
         (
             &[0, 7],
@@ -311,6 +266,7 @@ fn mk_config() -> KeyConfigUnit {
                 KeyInput::release(KEY_1),
                 KeyInput::release(KEY_LEFTSHIFT),
             ],
+            None,
         ),
         (
             &[0, 7],
@@ -321,6 +277,7 @@ fn mk_config() -> KeyConfigUnit {
                 KeyInput::release(KEY_1),
                 KeyInput::release(KEY_LEFTSHIFT),
             ],
+            None,
         ),
         (
             &[0, 7],
@@ -332,13 +289,8 @@ fn mk_config() -> KeyConfigUnit {
                 KeyInput::press(KEY_9),
                 KeyInput::release(KEY_LEFTSHIFT),
                 KeyInput::release(KEY_9),
-                // KeyInput::press(KEY_LEFTCTRL),
-                // KeyInput::press(KEY_LEFTBRACE),
-                // KeyInput::release(KEY_LEFTBRACE),
-                // KeyInput::release(KEY_LEFTCTRL),
-                // KeyInput::press(KEY_LEFT),
-                // KeyInput::release(KEY_LEFT),
             ],
+            None,
         ),
         (
             &[0],
@@ -349,6 +301,7 @@ fn mk_config() -> KeyConfigUnit {
                 KeyInput::release(KEY_8),
                 KeyInput::release(KEY_LEFTSHIFT),
             ],
+            None,
         ),
         (
             &[0],
@@ -359,6 +312,7 @@ fn mk_config() -> KeyConfigUnit {
                 KeyInput::release(KEY_9),
                 KeyInput::release(KEY_LEFTSHIFT),
             ],
+            None,
         ),
         (
             &[0],
@@ -369,6 +323,7 @@ fn mk_config() -> KeyConfigUnit {
                 KeyInput::release(KEY_RO),
                 KeyInput::release(KEY_LEFTSHIFT),
             ],
+            None,
         ),
         (
             &[0],
@@ -379,6 +334,7 @@ fn mk_config() -> KeyConfigUnit {
                 KeyInput::release(KEY_7),
                 KeyInput::release(KEY_LEFTSHIFT),
             ],
+            None,
         ),
         (
             &[0],
@@ -389,33 +345,60 @@ fn mk_config() -> KeyConfigUnit {
                 KeyInput::release(KEY_2),
                 KeyInput::release(KEY_LEFTSHIFT),
             ],
+            None,
         ),
-        // (
-        //     &[0],
-        //     [KEY_F, KEY_J],
-        //     vec![
-        //         KeyInput::press(KEY_LEFTMETA),
-        //         KeyInput::press(KEY_SPACE),
-        //         KeyInput::release(KEY_SPACE),
-        //         KeyInput::release(KEY_LEFTMETA),
-        //     ],
-        //     Some(1),
-        // ),
-        // (
-        //     &[1],
-        //     [KEY_F, KEY_J],
-        //     vec![
-        //         KeyInput::press(KEY_LEFTCTRL),
-        //         KeyInput::press(KEY_RIGHTBRACE),
-        //         KeyInput::release(KEY_RIGHTBRACE),
-        //         KeyInput::release(KEY_LEFTCTRL),
-        //         KeyInput::press(KEY_LEFTMETA),
-        //         KeyInput::press(KEY_SPACE),
-        //         KeyInput::release(KEY_SPACE),
-        //         KeyInput::release(KEY_LEFTMETA),
-        //     ],
-        //     Some(0),
-        // ),
+        (
+            &[0],
+            [KEY_F, KEY_J],
+            vec![
+                KeyInput::press(KEY_LEFTMETA),
+                KeyInput::press(KEY_SPACE),
+                KeyInput::release(KEY_SPACE),
+                KeyInput::release(KEY_LEFTMETA),
+            ],
+            Some(7),
+        ),
+        (
+            &[7],
+            [KEY_F, KEY_J],
+            vec![
+                KeyInput::press(KEY_LEFTCTRL),
+                KeyInput::press(KEY_RIGHTBRACE),
+                KeyInput::release(KEY_RIGHTBRACE),
+                KeyInput::release(KEY_LEFTCTRL),
+                KeyInput::press(KEY_LEFTMETA),
+                KeyInput::press(KEY_SPACE),
+                KeyInput::release(KEY_SPACE),
+                KeyInput::release(KEY_LEFTMETA),
+            ],
+            Some(0),
+        ),
+        (
+            &[0],
+            [KEY_D, KEY_S],
+            vec![
+                KeyInput::press(KEY_LEFTMETA),
+                KeyInput::press(KEY_SPACE),
+                KeyInput::release(KEY_SPACE),
+                KeyInput::release(KEY_LEFTMETA),
+            ],
+            Some(7),
+        ),
+        (
+            &[7],
+            [KEY_D, KEY_S],
+            vec![
+                KeyInput::press(KEY_LEFTCTRL),
+                KeyInput::press(KEY_RIGHTBRACE),
+                KeyInput::release(KEY_RIGHTBRACE),
+                KeyInput::release(KEY_LEFTCTRL),
+                KeyInput::press(KEY_LEFTMETA),
+                KeyInput::press(KEY_SPACE),
+                KeyInput::release(KEY_SPACE),
+                KeyInput::release(KEY_LEFTMETA),
+            ],
+            Some(0),
+        ),
     ];
     let modifires = [
         KEY_LEFTCTRL,
@@ -472,12 +455,12 @@ fn mk_config() -> KeyConfigUnit {
             .chain(
                 pair_keys_with_modifiers_config
                     .iter()
-                    .flat_map(|(cs, i, o)| {
+                    .flat_map(|(cs, i, o, t)| {
                         cs.iter().map(move |c| PairHotkeyEntry {
                             cond: *c,
                             input: *i,
                             output_keys: o.clone(),
-                            transition: None,
+                            transition: *t,
                         })
                     }),
             )
@@ -550,6 +533,40 @@ fn mk_config() -> KeyConfigUnit {
     }
 }
 
+fn make_config2() -> KeyConfigUnit {
+    let capslock_side = [
+        (KEY_I, KEY_UP),
+        (KEY_J, KEY_LEFT),
+        (KEY_K, KEY_DOWN),
+        (KEY_L, KEY_RIGHT),
+    ];
+    let capslock_side = capslock_side.iter().map(|(i, o)| SingleHotkeyEntry {
+        cond: 1,
+        input: KeyInput::press(*i),
+        output: vec![KeyInput::press(*o), KeyInput::release(*o)],
+        transition: None,
+        input_canceler: vec![KeyInput::release(*i)],
+    });
+    let single_hotkeys = [
+        (KeyInput::press(KEY_CAPSLOCK), 1),
+        (KeyInput::release(KEY_CAPSLOCK), 0),
+    ];
+    let single_hotkyes = single_hotkeys.iter().flat_map(|(i, t)| {
+        [0, 1].map(|c| SingleHotkeyEntry {
+            cond: c,
+            input: *i,
+            output: Vec::new(),
+            transition: Some(*t),
+            input_canceler: Vec::new(),
+        })
+    });
+    KeyConfigUnit {
+        pair_hotkeys: Vec::new(),
+        single_hotkeys: single_hotkyes.chain(capslock_side).collect(),
+        layer_name: "caps lock arrows",
+    }
+}
+
 fn main() {
-    read_events::run(vec![mk_config()]);
+    read_events::run(vec![make_config2(), mk_config()]);
 }
