@@ -213,6 +213,7 @@ trait KeyReceiver: Send {
 fn perform_action<T>(
     action: &Action,
     time: SystemTime,
+    layer_name: &'static str,
     recorder_state: &mut KeyRecorderUnitState<T>,
 ) where
     T: KeyReceiver,
@@ -223,7 +224,7 @@ fn perform_action<T>(
             .send_key((*output_key).into(), time);
     }
     if let Some(t) = action.transition {
-        log::debug!("state : {} -> {}", recorder_state.state, t);
+        log::debug!("[{}] state : {} -> {}", layer_name, recorder_state.state, t);
         recorder_state.state = t;
     }
     for c in &action.input_canceler {
@@ -234,13 +235,16 @@ fn perform_action<T>(
 fn fire_key_input<T>(
     key: KeyInput,
     time: SystemTime,
-    single_hotkeys: &HashMap<(KeyInput, State), Action>,
+    recorder_info: &KeyRecorderUnitInfo,
     recorder_state: &mut KeyRecorderUnitState<T>,
 ) where
     T: KeyReceiver,
 {
-    if let Some(action) = single_hotkeys.get(&(key, recorder_state.state)) {
-        perform_action(action, time, recorder_state);
+    if let Some(action) = recorder_info
+        .single_hotkeys_map
+        .get(&(key, recorder_state.state))
+    {
+        perform_action(action, time, recorder_info.layer_name, recorder_state);
     } else {
         recorder_state.key_receiver.send_key(key.into(), time);
     }
@@ -249,35 +253,33 @@ fn fire_key_input<T>(
 fn fire_specific_waiting_key_handler<T>(
     key: Key,
     time: SystemTime,
-    single_hotkeys: &HashMap<(KeyInput, State), Action>,
+    recorder_info: &KeyRecorderUnitInfo,
     recorder_state: &mut KeyRecorderUnitState<T>,
 ) where
     T: KeyReceiver,
 {
     if Some((key, time)) == recorder_state.waiting_key {
         recorder_state.waiting_key = None;
-        fire_key_input(KeyInput::press(key), time, single_hotkeys, recorder_state);
+        fire_key_input(KeyInput::press(key), time, recorder_info, recorder_state);
     }
 }
 
 fn fire_waiting_key<T>(
-    single_hotkeys: &HashMap<(KeyInput, State), Action>,
+    recorder_info: &KeyRecorderUnitInfo,
     recorder_state: &mut KeyRecorderUnitState<T>,
 ) where
     T: KeyReceiver,
 {
     if let Some((key, time)) = recorder_state.waiting_key {
         recorder_state.waiting_key = None;
-        fire_key_input(KeyInput::press(key), time, single_hotkeys, recorder_state);
+        fire_key_input(KeyInput::press(key), time, recorder_info, recorder_state);
     }
 }
 
 fn send_key_handler<'a, T>(
     key: KeyInputWithRepeat,
     time: SystemTime,
-    pair_hotkeys_map: &'a HashMap<(BTreeSet<Key>, State), Action>,
-    pair_input_keys: &HashSet<(Key, State)>,
-    single_hotkeys_map: &HashMap<(KeyInput, State), Action>,
+    recorder_info: &'a KeyRecorderUnitInfo,
     pressing_pair: &mut PressingPair<'a>,
     recorder_state: &mut KeyRecorderUnitState<T>,
     tx: &Sender<KeyRecorderBehavior>,
@@ -287,27 +289,30 @@ fn send_key_handler<'a, T>(
     if !recorder_state.input_canceler.remove(&key.into()) {
         match key {
             KeyInputWithRepeat(key_name, KeyInputKindWithRepeat::Press)
-                if pair_input_keys.contains(&(key_name, recorder_state.state.clone())) =>
+                if recorder_info
+                    .pair_input_keys
+                    .contains(&(key_name, recorder_state.state.clone())) =>
             {
                 match recorder_state.waiting_key {
                     Some((waiting_key_kind, _)) => {
                         let key_set = [waiting_key_kind, key_name];
                         let key_set = key_set.iter().copied().collect::<BTreeSet<Key>>();
-                        if let Some(action) =
-                            pair_hotkeys_map.get(&(key_set.clone(), recorder_state.state.clone()))
+                        if let Some(action) = recorder_info
+                            .pair_hotkeys_map
+                            .get(&(key_set.clone(), recorder_state.state.clone()))
                         {
                             recorder_state.waiting_key = None;
                             *pressing_pair = PressingPair {
                                 pair: key_set,
                                 action: Some(action),
                             };
-                            perform_action(action, time, recorder_state);
+                            perform_action(action, time, recorder_info.layer_name, recorder_state);
                             return;
                         } else {
                             fire_key_input(
                                 KeyInput::press(waiting_key_kind),
                                 time,
-                                single_hotkeys_map,
+                                &recorder_info,
                                 recorder_state,
                             );
                             recorder_state.waiting_key = Some((key_name, time));
@@ -323,12 +328,17 @@ fn send_key_handler<'a, T>(
             KeyInputWithRepeat(key_name, KeyInputKindWithRepeat::Repeat)
                 if pressing_pair.pair.contains(&key_name) =>
             {
-                perform_action(&pressing_pair.action.unwrap(), time, recorder_state);
+                perform_action(
+                    &pressing_pair.action.unwrap(),
+                    time,
+                    recorder_info.layer_name,
+                    recorder_state,
+                );
             }
             _ => {
                 if !pressing_pair.pair.remove(&key.0) {
-                    fire_waiting_key(single_hotkeys_map, recorder_state);
-                    fire_key_input(key.into(), time, single_hotkeys_map, recorder_state);
+                    fire_waiting_key(&recorder_info, recorder_state);
+                    fire_key_input(key.into(), time, &recorder_info, recorder_state);
                 }
             }
         };
@@ -345,6 +355,13 @@ where
     state: State,
     input_canceler: HashSet<KeyInput>,
     waiting_key: Option<(Key, SystemTime)>,
+}
+
+struct KeyRecorderUnitInfo {
+    pair_hotkeys_map: HashMap<(BTreeSet<Key>, State), Action>,
+    pair_input_keys: HashSet<(Key, State)>,
+    single_hotkeys_map: HashMap<(KeyInput, State), Action>,
+    layer_name: &'static str,
 }
 
 impl KeyRecorderUnit {
@@ -412,22 +429,26 @@ impl KeyRecorderUnit {
                 input_canceler: HashSet::new(),
                 waiting_key: None,
             };
+            let recorder_info = KeyRecorderUnitInfo {
+                pair_hotkeys_map,
+                pair_input_keys,
+                single_hotkeys_map,
+                layer_name,
+            };
             for received in rx {
                 match received {
                     KeyRecorderBehavior::FireSpecificWaitingKey((key, time)) => {
                         fire_specific_waiting_key_handler(
                             key,
                             time,
-                            &single_hotkeys_map,
+                            &recorder_info,
                             &mut recorder_state,
                         )
                     }
                     KeyRecorderBehavior::SendKey((key, time)) => send_key_handler(
                         key,
                         time,
-                        &pair_hotkeys_map,
-                        &pair_input_keys,
-                        &single_hotkeys_map,
+                        &recorder_info,
                         &mut pressing_pair,
                         &mut recorder_state,
                         &tx_clone,
