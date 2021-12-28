@@ -26,7 +26,7 @@ impl KeyWriter {
     }
 
     pub fn fire_key_input(&mut self, key: KeyInput) {
-        log::debug!("{:?}", key);
+        log::debug!("-----> {:?}", key);
         let msg = [InputEvent::new(EventType::KEY, key.0.code(), key.1.into())];
         self.device.emit(&msg).unwrap();
         std::thread::sleep(core::time::Duration::from_millis(5));

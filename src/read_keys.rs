@@ -35,7 +35,7 @@ impl From<KeyInputKind> for i32 {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub struct KeyInput(pub Key, pub KeyInputKind);
 
 impl KeyInput {
@@ -45,6 +45,22 @@ impl KeyInput {
 
     pub fn release(key: Key) -> KeyInput {
         Self(key, KeyInputKind::Release)
+    }
+}
+
+impl Debug for KeyInput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use KeyInputKind::*;
+        let KeyInput(key, input_kind) = self;
+        write!(
+            f,
+            "{:?} {}",
+            key,
+            match input_kind {
+                Press => "↓",
+                Release => "↑",
+            }
+        )
     }
 }
 
@@ -174,6 +190,7 @@ fn fire_waiting_key_delay(key: (Key, SystemTime), tx: Sender<KeyRecorderBehavior
 
 pub struct KeyRecorderUnit {
     tx: Sender<KeyRecorderBehavior>,
+    layer_name: &'static str,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -331,13 +348,11 @@ where
 }
 
 impl KeyRecorderUnit {
-    fn new(
-        key_config: KeyConfigUnit,
-        key_receiver: impl KeyReceiver + 'static,
-    ) -> KeyRecorderUnit {
+    fn new(key_config: KeyConfigUnit, key_receiver: impl KeyReceiver + 'static) -> KeyRecorderUnit {
         let (tx, rx) = channel();
         let tx_clone = tx.clone();
-        log::debug!("{:?}", key_config);
+        let layer_name = key_config.layer_name;
+        log::debug!("{}, {:?}", layer_name, key_config);
         thread::spawn(move || {
             let pair_input_keys: HashSet<(Key, State)> = key_config
                 .pair_hotkeys
@@ -420,12 +435,13 @@ impl KeyRecorderUnit {
                 }
             }
         });
-        KeyRecorderUnit { tx }
+        KeyRecorderUnit { tx, layer_name }
     }
 }
 
 impl KeyReceiver for KeyRecorderUnit {
     fn send_key(&mut self, key: KeyInputWithRepeat, time: SystemTime) {
+        log::debug!("[{}] ← {:?}", self.layer_name, key);
         self.tx
             .send(KeyRecorderBehavior::SendKey((key, time)))
             .unwrap();

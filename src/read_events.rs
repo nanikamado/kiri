@@ -48,7 +48,7 @@ pub fn run(config: KeyConfig) {
                 break;
             }
             let key = KeyInputWithRepeat(key, input_event.value().into());
-            log::debug!("{:?}", key);
+            // log::debug!("← {:?}", key);
             key_recorder.send_key(key, input_event.timestamp());
         }
     }
