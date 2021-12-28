@@ -1,7 +1,7 @@
 use crate::write_keys::{self, KeyWriter};
 use evdev::Key;
 use std::collections::{BTreeSet, HashMap, HashSet};
-use std::fmt;
+use std::fmt::{self, Debug};
 use std::time::SystemTime;
 use std::{
     sync::mpsc::{channel, Sender},
@@ -66,8 +66,25 @@ impl From<i32> for KeyInputKindWithRepeat {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub struct KeyInputWithRepeat(pub Key, pub KeyInputKindWithRepeat);
+
+impl Debug for KeyInputWithRepeat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use KeyInputKindWithRepeat::*;
+        let KeyInputWithRepeat(key, input_kind) = self;
+        write!(
+            f,
+            "{:?} {}",
+            key,
+            match input_kind {
+                Press => "↓",
+                Release => "↑",
+                Repeat => "↺",
+            }
+        )
+    }
+}
 
 #[derive(PartialEq, Eq, Hash, Clone)]
 pub struct SingleHotkeyEntry {
@@ -102,6 +119,7 @@ impl From<KeyInput> for KeyInputWithRepeat {
 pub struct KeyConfigUnit {
     pub pair_hotkeys: Vec<PairHotkeyEntry>,
     pub single_hotkeys: Vec<SingleHotkeyEntry>,
+    pub layer_name: &'static str,
 }
 
 impl fmt::Debug for KeyConfigUnit {

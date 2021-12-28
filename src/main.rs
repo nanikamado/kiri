@@ -546,6 +546,7 @@ fn mk_config() -> KeyConfigUnit {
             .chain(modifiers_trans)
             .chain(sands_config)
             .collect(),
+        layer_name: "big config",
     }
 }
 

@@ -41,13 +41,14 @@ pub fn run(config: KeyConfig) {
     let mut key_recorder = KeyRecorder::new(config);
     log::info!("config loaded");
     for input_event in make_read_channel(keyboards.into_iter()) {
-        log::debug!("{:?}", input_event.kind());
-        log::debug!("{:?}", input_event.value());
+        // log::debug!("{:?}", input_event.kind());
+        // log::debug!("{:?}", input_event.value());
         if let InputEventKind::Key(key) = input_event.kind() {
             if input_event.value() == 1 && Key::KEY_CALC == key {
                 break;
             }
             let key = KeyInputWithRepeat(key, input_event.value().into());
+            log::debug!("{:?}", key);
             key_recorder.send_key(key, input_event.timestamp());
         }
     }
