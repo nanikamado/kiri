@@ -10,14 +10,6 @@ fn mk_config() -> KeyConfigUnit {
     // 0  : normal
     // 7   : jp input
     // 1   : jp input with modifiers
-    // 2   : capslock plessing, move to jp after release
-    // 3   : other key pressed while capslock is on,
-    //       or capslock plessing after jp, so move to []
-    //       after release
-    // 4   : space is pressing
-    // 5   : other key pressed while space is pressed
-    // 6   : foot pedal
-    let all_states: &[State] = &[0, 7, 1, 2, 3, 4, 5];
     let singeta_config: &[(&[Key], &[Key])] = &[
         (&[KEY_A], &[KEY_N, KEY_O]),
         (&[KEY_S], &[KEY_T, KEY_O]),
@@ -154,24 +146,7 @@ fn mk_config() -> KeyConfigUnit {
         .into_iter()
         .map(|(i, o)| -> (&[State], _, _, _) { (&[7], *i, *o, None) })
         .collect();
-    // []  : normal
-    // 0   : jp input
-    // 1   : jp input with modifiers
-    // 2   : capslock plessing, move to jp after release
-    // 3   : other key pressed while capslock is on,
-    //       or capslock plessing after jp, so move to []
-    //       after release
-    // 4   : space is pressing
-    // 5   : other key pressed while space is pressed
-    // 6   : foot pedal
     let key_config_r: &[(&[State], &[Key], &[Key], Option<Transition>)] = &[
-        (all_states, &[KEY_HENKAN], &[KEY_ENTER], None),
-        (all_states, &[KEY_MUHENKAN], &[KEY_BACKSPACE], None),
-        // (&[0], &[KEY_GRAVE], &[KEY_HENKAN], Some(1)),
-        // (&[1], &[KEY_GRAVE], &[KEY_MUHENKAN], Some(0)),
-        // (&[0], &[KEY_F, KEY_J], &[KEY_HENKAN], Some(1)),
-        // (&[1], &[KEY_F, KEY_J], &[KEY_MUHENKAN], Some(0)),
-        //
         (&[7], &[KEY_R, KEY_G], &[KEY_SLASH], None),
         (
             &[7],
@@ -190,24 +165,6 @@ fn mk_config() -> KeyConfigUnit {
         k.append(&mut singeta_config);
         k
     };
-    let capslock_side: &[(Key, Vec<_>)] = &[
-        (KEY_I, vec![KEY_UP]),
-        (KEY_J, vec![KEY_LEFT]),
-        (KEY_K, vec![KEY_DOWN]),
-        (KEY_L, vec![KEY_RIGHT]),
-    ];
-    let capslock_midifiers: &[(KeyInput, Vec<KeyInput>)] = &[
-        (KeyInput::press(KEY_F), vec![KeyInput::press(KEY_LEFTSHIFT)]),
-        (KeyInput::press(KEY_E), vec![KeyInput::press(KEY_LEFTCTRL)]),
-        (
-            KeyInput::release(KEY_F),
-            vec![KeyInput::release(KEY_LEFTSHIFT)],
-        ),
-        (
-            KeyInput::release(KEY_E),
-            vec![KeyInput::release(KEY_LEFTCTRL)],
-        ),
-    ];
     let pair_keys_with_modifiers_config: &[(&[State], [Key; 2], Vec<_>, Option<Transition>)] = &[
         (
             &[0, 7],
@@ -243,15 +200,15 @@ fn mk_config() -> KeyConfigUnit {
             None,
         ),
         (
-            &[0, 7],
+            &[7],
             [KEY_F, KEY_G],
             vec![
                 KeyInput::press(KEY_LEFTSHIFT),
                 KeyInput::press(KEY_8),
                 KeyInput::release(KEY_8),
                 KeyInput::press(KEY_9),
-                KeyInput::release(KEY_LEFTSHIFT),
                 KeyInput::release(KEY_9),
+                KeyInput::release(KEY_LEFTSHIFT),
             ],
             None,
         ),
@@ -389,17 +346,6 @@ fn mk_config() -> KeyConfigUnit {
             })
         })
         .collect::<Vec<_>>();
-    let all_alphabet_keys = &[
-        KEY_A, KEY_B, KEY_C, KEY_D, KEY_E, KEY_F, KEY_G, KEY_H, KEY_I, KEY_J, KEY_K, KEY_L, KEY_M,
-        KEY_N, KEY_O, KEY_P, KEY_Q, KEY_R, KEY_S, KEY_T, KEY_U, KEY_V, KEY_W, KEY_X, KEY_Y, KEY_Z,
-    ];
-    let sands_config = all_alphabet_keys.iter().map(|k| SingleHotkeyEntry {
-        cond: 4,
-        input: KeyInput::press(*k),
-        output: vec![KeyInput::press(*k)],
-        transition: Some(5),
-        input_canceler: Vec::new(),
-    });
     KeyConfigUnit {
         pair_hotkeys: key_config_r
             .iter()
@@ -443,47 +389,13 @@ fn mk_config() -> KeyConfigUnit {
                     input_canceler: vec![KeyInput::release(i[0])],
                 })
             })
-            .chain(capslock_side.iter().flat_map(|(input, output)| {
-                [2, 3].map(|c| SingleHotkeyEntry {
-                    cond: c,
-                    input: KeyInput::press(*input),
-                    output: (*output)
-                        .iter()
-                        .flat_map(|key| [KeyInput::press(*key), KeyInput::release(*key)])
-                        .collect::<Vec<_>>(),
-                    transition: Some(3),
-                    input_canceler: vec![KeyInput::release(*input)],
-                })
-            }))
-            .chain(capslock_side.iter().map(|(input, output)| {
-                SingleHotkeyEntry {
-                    cond: 6,
-                    input: KeyInput::press(*input),
-                    output: (*output)
-                        .iter()
-                        .flat_map(|key| [KeyInput::press(*key), KeyInput::release(*key)])
-                        .collect::<Vec<_>>(),
-                    transition: None,
-                    input_canceler: vec![KeyInput::release(*input)],
-                }
-            }))
-            .chain(capslock_midifiers.iter().flat_map(|(i, o)| {
-                [2, 3].map(|c| SingleHotkeyEntry {
-                    cond: c,
-                    input: *i,
-                    output: o.to_vec(),
-                    transition: Some(3),
-                    input_canceler: Vec::new(),
-                })
-            }))
             .chain(modifiers_trans)
-            .chain(sands_config)
             .collect(),
         layer_name: "big config",
     }
 }
 
-fn make_config2() -> KeyConfigUnit {
+fn config_caps_lock_arrow() -> KeyConfigUnit {
     let capslock_side = [
         (KEY_I, KEY_UP),
         (KEY_J, KEY_LEFT),
@@ -592,6 +504,36 @@ fn config_sands() -> KeyConfigUnit {
     }
 }
 
+fn config_simple_remap() -> KeyConfigUnit {
+    let key_config_r: &[(Key, Key)] = &[(KEY_HENKAN, KEY_ENTER), (KEY_MUHENKAN, KEY_BACKSPACE)];
+    KeyConfigUnit {
+        pair_hotkeys: Vec::new(),
+        single_hotkeys: key_config_r
+            .iter()
+            .map(|(i, o)| SingleHotkeyEntry {
+                cond: 0,
+                input: KeyInput::press(*i),
+                output: vec![KeyInput::press(*o)],
+                transition: None,
+                input_canceler: Vec::new(),
+            })
+            .chain(key_config_r.iter().map(|(i, o)| SingleHotkeyEntry {
+                cond: 0,
+                input: KeyInput::release(*i),
+                output: vec![KeyInput::release(*o)],
+                transition: None,
+                input_canceler: Vec::new(),
+            }))
+            .collect(),
+        layer_name: "simple remap",
+    }
+}
+
 fn main() {
-    read_events::run(vec![make_config2(), config_sands(), mk_config()]);
+    read_events::run(vec![
+        config_simple_remap(),
+        config_caps_lock_arrow(),
+        config_sands(),
+        mk_config(),
+    ]);
 }
