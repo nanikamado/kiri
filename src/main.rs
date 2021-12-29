@@ -190,43 +190,6 @@ fn mk_config() -> KeyConfigUnit {
         k.append(&mut singeta_config);
         k
     };
-    let single_keys_with_modifires: &[(
-        &[State],
-        KeyInput,
-        Vec<_>,
-        Option<Transition>,
-        &[KeyInput],
-    )] = &[
-        (
-            &[0],
-            KeyInput::press(KEY_SPACE),
-            vec![KeyInput::press(KEY_LEFTSHIFT)],
-            Some(4),
-            &[],
-        ),
-        (&[4, 5], KeyInput::press(KEY_SPACE), Vec::new(), None, &[]),
-        (
-            &[4],
-            KeyInput::release(KEY_SPACE),
-            vec![
-                KeyInput::release(KEY_LEFTSHIFT),
-                KeyInput::press(KEY_SPACE),
-                KeyInput::release(KEY_SPACE),
-            ],
-            Some(0),
-            &[],
-        ),
-        (
-            &[5],
-            KeyInput::release(KEY_SPACE),
-            vec![KeyInput::release(KEY_LEFTSHIFT)],
-            Some(0),
-            &[],
-        ),
-        (&[0], KeyInput::press(KEY_F21), vec![], Some(6), &[]),
-        (&[6], KeyInput::press(KEY_F21), vec![], None, &[]),
-        (&[6], KeyInput::release(KEY_F21), vec![], Some(0), &[]),
-    ];
     let capslock_side: &[(Key, Vec<_>)] = &[
         (KEY_I, vec![KEY_UP]),
         (KEY_J, vec![KEY_LEFT]),
@@ -480,19 +443,6 @@ fn mk_config() -> KeyConfigUnit {
                     input_canceler: vec![KeyInput::release(i[0])],
                 })
             })
-            .chain(
-                single_keys_with_modifires
-                    .iter()
-                    .flat_map(|(cs, i, o, t, canceler)| {
-                        cs.iter().map(move |c| SingleHotkeyEntry {
-                            cond: *c,
-                            input: *i,
-                            output: o.clone(),
-                            transition: *t,
-                            input_canceler: canceler.to_vec(),
-                        })
-                    }),
-            )
             .chain(capslock_side.iter().flat_map(|(input, output)| {
                 [2, 3].map(|c| SingleHotkeyEntry {
                     cond: c,
@@ -591,6 +541,57 @@ fn make_config2() -> KeyConfigUnit {
     }
 }
 
+fn config_sands() -> KeyConfigUnit {
+    let config: &[(&[u64], KeyInput, &[KeyInput], Option<u64>)] = &[
+        (
+            &[0],
+            KeyInput::press(KEY_SPACE),
+            &[KeyInput::press(KEY_LEFTSHIFT)],
+            Some(1),
+        ),
+        (&[1, 2], KeyInput::press(KEY_SPACE), &[], None),
+        (
+            &[1],
+            KeyInput::release(KEY_SPACE),
+            &[
+                KeyInput::release(KEY_LEFTSHIFT),
+                KeyInput::press(KEY_SPACE),
+                KeyInput::release(KEY_SPACE),
+            ],
+            Some(0),
+        ),
+        (
+            &[2],
+            KeyInput::release(KEY_SPACE),
+            &[KeyInput::release(KEY_LEFTSHIFT)],
+            Some(0),
+        ),
+    ];
+    let config = config.iter().flat_map(|(cs, i, o, t)| {
+        cs.iter().map(move |c| SingleHotkeyEntry {
+            cond: *c,
+            input: *i,
+            output: o.to_vec(),
+            transition: *t,
+            input_canceler: Vec::new(),
+        })
+    });
+    let config2 = all_keys()
+        .filter(|k| *k != KEY_SPACE)
+        .map(|k| SingleHotkeyEntry {
+            cond: 1,
+            input: KeyInput::press(k),
+            output: vec![KeyInput::press(k)],
+            transition: Some(2),
+            input_canceler: Vec::new(),
+        });
+    KeyConfigUnit {
+        pair_hotkeys: Vec::new(),
+        single_hotkeys: config.chain(config2).collect(),
+        layer_name: "SandS",
+    }
+}
+
 fn main() {
-    read_events::run(vec![make_config2(), mk_config()]);
+    read_events::run(vec![make_config2(), config_sands(), mk_config()]);
 }
