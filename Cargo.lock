@@ -85,6 +85,7 @@ dependencies = [
 [[package]]
 name = "evdev-keys"
 version = "0.1.0"
+source = "git+https://github.com/nanikamado/evdev-keys#2ef3426d60332c07142b8f4187bf9618cb4b0258"
 dependencies = [
  "evdev",
 ]
