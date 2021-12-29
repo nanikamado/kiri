@@ -369,7 +369,6 @@ impl KeyRecorderUnit {
         let (tx, rx) = channel();
         let tx_clone = tx.clone();
         let layer_name = key_config.layer_name;
-        log::debug!("{}, {:?}", layer_name, key_config);
         thread::spawn(move || {
             let pair_input_keys: HashSet<(Key, State)> = key_config
                 .pair_hotkeys
@@ -421,7 +420,6 @@ impl KeyRecorderUnit {
                     },
                 )
                 .collect();
-            log::debug!("{:?}", single_hotkeys_map);
             let mut pressing_pair: PressingPair = Default::default();
             let mut recorder_state = KeyRecorderUnitState {
                 key_receiver,
