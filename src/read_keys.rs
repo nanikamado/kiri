@@ -291,7 +291,7 @@ fn send_key_handler<'a, T>(
             KeyInputWithRepeat(key_name, KeyInputKindWithRepeat::Press)
                 if recorder_info
                     .pair_input_keys
-                    .contains(&(key_name, recorder_state.state.clone())) =>
+                    .contains(&(key_name, recorder_state.state)) =>
             {
                 match recorder_state.waiting_key {
                     Some((waiting_key_kind, _)) => {
@@ -299,7 +299,7 @@ fn send_key_handler<'a, T>(
                         let key_set = key_set.iter().copied().collect::<BTreeSet<Key>>();
                         if let Some(action) = recorder_info
                             .pair_hotkeys_map
-                            .get(&(key_set.clone(), recorder_state.state.clone()))
+                            .get(&(key_set.clone(), recorder_state.state))
                         {
                             recorder_state.waiting_key = None;
                             *pressing_pair = PressingPair {
@@ -307,12 +307,11 @@ fn send_key_handler<'a, T>(
                                 action: Some(action),
                             };
                             perform_action(action, time, recorder_info.layer_name, recorder_state);
-                            return;
                         } else {
                             fire_key_input(
                                 KeyInput::press(waiting_key_kind),
                                 time,
-                                &recorder_info,
+                                recorder_info,
                                 recorder_state,
                             );
                             recorder_state.waiting_key = Some((key_name, time));
@@ -329,7 +328,7 @@ fn send_key_handler<'a, T>(
                 if pressing_pair.pair.contains(&key_name) =>
             {
                 perform_action(
-                    &pressing_pair.action.unwrap(),
+                    pressing_pair.action.unwrap(),
                     time,
                     recorder_info.layer_name,
                     recorder_state,
@@ -337,8 +336,8 @@ fn send_key_handler<'a, T>(
             }
             _ => {
                 if !pressing_pair.pair.remove(&key.0) {
-                    fire_waiting_key(&recorder_info, recorder_state);
-                    fire_key_input(key.into(), time, &recorder_info, recorder_state);
+                    fire_waiting_key(recorder_info, recorder_state);
+                    fire_key_input(key.into(), time, recorder_info, recorder_state);
                 }
             }
         };
@@ -374,7 +373,7 @@ impl KeyRecorderUnit {
                 .pair_hotkeys
                 .iter()
                 .flat_map(|PairHotkeyEntry { cond, input, .. }| {
-                    input.map(move |i| (i, cond.clone()))
+                    input.map(move |i| (i, *cond))
                 })
                 .collect();
             let pair_hotkeys_map: HashMap<(BTreeSet<Key>, State), Action> = key_config

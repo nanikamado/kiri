@@ -143,7 +143,7 @@ fn mk_config() -> KeyConfigUnit {
         (&[KEY_B], &[KEY_T, KEY_U]),
     ];
     let mut singeta_config: Vec<(&[State], &[Key], &[Key], Option<Transition>)> = singeta_config
-        .into_iter()
+        .iter()
         .map(|(i, o)| -> (&[State], _, _, _) { (&[7], *i, *o, None) })
         .collect();
     let key_config_r: &[(&[State], &[Key], &[Key], Option<Transition>)] = &[
