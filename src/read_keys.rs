@@ -372,9 +372,7 @@ impl KeyRecorderUnit {
             let pair_input_keys: HashSet<(Key, State)> = key_config
                 .pair_hotkeys
                 .iter()
-                .flat_map(|PairHotkeyEntry { cond, input, .. }| {
-                    input.map(move |i| (i, *cond))
-                })
+                .flat_map(|PairHotkeyEntry { cond, input, .. }| input.map(move |i| (i, *cond)))
                 .collect();
             let pair_hotkeys_map: HashMap<(BTreeSet<Key>, State), Action> = key_config
                 .pair_hotkeys
