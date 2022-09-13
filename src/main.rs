@@ -247,7 +247,7 @@ fn mk_config() -> KeyConfigUnit {
         ),
         (
             &[0],
-            [KEY_I, KEY_O],
+            [KEY_E, KEY_O],
             vec![
                 KeyInput::press(KEY_LEFTSHIFT),
                 KeyInput::press(KEY_7),
@@ -258,7 +258,7 @@ fn mk_config() -> KeyConfigUnit {
         ),
         (
             &[0],
-            [KEY_W, KEY_E],
+            [KEY_W, KEY_I],
             vec![
                 KeyInput::press(KEY_LEFTSHIFT),
                 KeyInput::press(KEY_2),
@@ -397,53 +397,61 @@ fn mk_config() -> KeyConfigUnit {
 
 fn config_caps_lock_arrow() -> KeyConfigUnit {
     let capslock_side = [
-        (KEY_I, KEY_UP),
-        (KEY_J, KEY_LEFT),
-        (KEY_K, KEY_DOWN),
-        (KEY_L, KEY_RIGHT),
+        (1, KEY_I, None, KEY_UP),
+        (1, KEY_J, None, KEY_LEFT),
+        (1, KEY_K, None, KEY_DOWN),
+        (1, KEY_L, None, KEY_RIGHT),
+        (2, KEY_I, Some(KEY_LEFTCTRL), KEY_UP),
+        (2, KEY_J, Some(KEY_LEFTCTRL), KEY_LEFT),
+        (2, KEY_K, Some(KEY_LEFTCTRL), KEY_DOWN),
+        (2, KEY_L, Some(KEY_LEFTCTRL), KEY_RIGHT),
+        (3, KEY_I, Some(KEY_LEFTMETA), KEY_I),
+        (3, KEY_J, Some(KEY_LEFTMETA), KEY_J),
+        (3, KEY_K, Some(KEY_LEFTMETA), KEY_K),
+        (3, KEY_L, Some(KEY_LEFTMETA), KEY_L),
+        (4, KEY_I, None, KEY_ESC),
+        (4, KEY_J, None, KEY_HOME),
+        (4, KEY_K, None, KEY_ESC),
+        (4, KEY_L, None, KEY_END),
     ];
-    let capslock_side = capslock_side.iter().flat_map(|(i, o)| {
-        [1, 2].map(|c| SingleHotkeyEntry {
+    let capslock_side = capslock_side
+        .iter()
+        .map(|&(c, i, o1, o2)| SingleHotkeyEntry {
             cond: c,
-            input: KeyInput::press(*i),
-            output: vec![KeyInput::press(*o), KeyInput::release(*o)],
+            input: KeyInput::press(i),
+            output: if let Some(o1) = o1 {
+                vec![
+                    KeyInput::press(o1),
+                    KeyInput::press(o2),
+                    KeyInput::release(o2),
+                    KeyInput::release(o1),
+                ]
+            } else {
+                vec![KeyInput::press(o2), KeyInput::release(o2)]
+            },
             transition: None,
             input_canceler: Vec::new(),
-        })
-    });
-    let single_hotkeys: &[(&[State], KeyInput, &[KeyInput], State, &[KeyInput])] = &[
-        (&[0, 1], KeyInput::press(KEY_CAPSLOCK), &[], 1, &[]),
-        (&[2], KeyInput::press(KEY_CAPSLOCK), &[], 2, &[]),
-        (&[0, 1], KeyInput::release(KEY_CAPSLOCK), &[], 0, &[]),
-        (
-            &[2],
-            KeyInput::release(KEY_CAPSLOCK),
-            &[KeyInput::release(KEY_LEFTCTRL)],
-            0,
-            &[KeyInput::release(KEY_E)],
-        ),
-        (
-            &[1, 2],
-            KeyInput::press(KEY_E),
-            &[KeyInput::press(KEY_LEFTCTRL)],
-            2,
-            &[],
-        ),
-        (
-            &[2],
-            KeyInput::release(KEY_E),
-            &[KeyInput::release(KEY_LEFTCTRL)],
-            1,
-            &[],
-        ),
+        });
+    let single_hotkeys: &[(&[State], KeyInput, &[KeyInput], State)] = &[
+        (&[0, 1], KeyInput::press(KEY_CAPSLOCK), &[], 1),
+        (&[1, 2, 3, 4], KeyInput::press(KEY_E), &[], 2),
+        (&[1, 2, 3, 4], KeyInput::press(KEY_R), &[], 3),
+        (&[1, 2, 3, 4], KeyInput::press(KEY_F), &[], 4),
+        (&[2], KeyInput::press(KEY_CAPSLOCK), &[], 2),
+        (&[3], KeyInput::press(KEY_CAPSLOCK), &[], 3),
+        (&[4], KeyInput::press(KEY_CAPSLOCK), &[], 4),
+        (&[0, 1, 2, 3, 4], KeyInput::release(KEY_CAPSLOCK), &[], 0),
+        (&[2], KeyInput::release(KEY_E), &[], 1),
+        (&[3], KeyInput::release(KEY_R), &[], 1),
+        (&[4], KeyInput::release(KEY_F), &[], 1),
     ];
-    let single_hotkyes = single_hotkeys.iter().flat_map(|(c, i, o, t, cancel)| {
+    let single_hotkyes = single_hotkeys.iter().flat_map(|(c, i, o, t)| {
         c.iter().map(move |c| SingleHotkeyEntry {
             cond: *c,
             input: *i,
             output: o.to_vec(),
             transition: Some(*t),
-            input_canceler: cancel.to_vec(),
+            input_canceler: Vec::new(),
         })
     });
     KeyConfigUnit {
