@@ -64,41 +64,14 @@ impl Debug for KeyInput {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
-pub enum KeyInputKindWithRepeat {
-    Press,
-    Release,
-    Repeat,
-}
-
-impl From<i32> for KeyInputKindWithRepeat {
+impl From<i32> for KeyInputKind {
     fn from(i: i32) -> Self {
         match i {
             0 => Self::Release,
             1 => Self::Press,
-            2 => Self::Repeat,
+            2 => Self::Press,
             _ => panic!("unknown input_event value"),
         }
-    }
-}
-
-#[derive(PartialEq, Eq, Hash, Clone, Copy)]
-pub struct KeyInputWithRepeat(pub Key, pub KeyInputKindWithRepeat);
-
-impl Debug for KeyInputWithRepeat {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use KeyInputKindWithRepeat::*;
-        let KeyInputWithRepeat(key, input_kind) = self;
-        write!(
-            f,
-            "{:?} {}",
-            key,
-            match input_kind {
-                Press => "↓",
-                Release => "↑",
-                Repeat => "↺",
-            }
-        )
     }
 }
 
@@ -109,26 +82,6 @@ pub struct SingleHotkeyEntry {
     pub output: Vec<KeyInput>,
     pub transition: Option<Transition>,
     pub input_canceler: Vec<KeyInput>,
-}
-
-impl From<KeyInputWithRepeat> for KeyInput {
-    fn from(KeyInputWithRepeat(name, kind): KeyInputWithRepeat) -> Self {
-        match kind {
-            KeyInputKindWithRepeat::Press | KeyInputKindWithRepeat::Repeat => {
-                Self(name, KeyInputKind::Press)
-            }
-            KeyInputKindWithRepeat::Release => Self(name, KeyInputKind::Release),
-        }
-    }
-}
-
-impl From<KeyInput> for KeyInputWithRepeat {
-    fn from(KeyInput(name, kind): KeyInput) -> Self {
-        match kind {
-            KeyInputKind::Press => Self(name, KeyInputKindWithRepeat::Press),
-            KeyInputKind::Release => Self(name, KeyInputKindWithRepeat::Release),
-        }
-    }
 }
 
 #[derive(PartialEq, Eq, Clone)]
@@ -177,7 +130,7 @@ type KeyEv = (Key, SystemTime);
 #[derive(Debug)]
 enum KeyRecorderBehavior {
     FireSpecificWaitingKey(KeyEv),
-    SendKey((KeyInputWithRepeat, SystemTime)),
+    SendKey((KeyInput, SystemTime)),
 }
 
 fn fire_waiting_key_delay(key: (Key, SystemTime), tx: Sender<KeyRecorderBehavior>) {
@@ -207,7 +160,7 @@ pub struct PressingPair<'a> {
 }
 
 trait KeyReceiver: Send {
-    fn send_key(&mut self, key: KeyInputWithRepeat, time: SystemTime);
+    fn send_key(&mut self, key: KeyInput, time: SystemTime);
 }
 
 fn perform_action<T>(
@@ -277,7 +230,7 @@ fn fire_waiting_key<T>(
 }
 
 fn send_key_handler<'a, T>(
-    key: KeyInputWithRepeat,
+    key: KeyInput,
     time: SystemTime,
     recorder_info: &'a KeyRecorderUnitInfo,
     pressing_pair: &mut PressingPair<'a>,
@@ -288,7 +241,7 @@ fn send_key_handler<'a, T>(
 {
     if !recorder_state.input_canceler.remove(&key.into()) {
         match key {
-            KeyInputWithRepeat(key_name, KeyInputKindWithRepeat::Press)
+            KeyInput(key_name, KeyInputKind::Press)
                 if recorder_info
                     .pair_input_keys
                     .contains(&(key_name, recorder_state.state)) =>
@@ -324,21 +277,10 @@ fn send_key_handler<'a, T>(
                     }
                 }
             }
-            KeyInputWithRepeat(key_name, KeyInputKindWithRepeat::Repeat)
-                if pressing_pair.pair.contains(&key_name) =>
-            {
-                perform_action(
-                    pressing_pair.action.unwrap(),
-                    time,
-                    recorder_info.layer_name,
-                    recorder_state,
-                );
-            }
             _ => {
-                if !pressing_pair.pair.remove(&key.0) {
-                    fire_waiting_key(recorder_info, recorder_state);
-                    fire_key_input(key.into(), time, recorder_info, recorder_state);
-                }
+                pressing_pair.pair.remove(&key.0);
+                fire_waiting_key(recorder_info, recorder_state);
+                fire_key_input(key.into(), time, recorder_info, recorder_state);
             }
         };
     } else {
@@ -456,16 +398,16 @@ impl KeyRecorderUnit {
 }
 
 impl KeyReceiver for KeyRecorderUnit {
-    fn send_key(&mut self, key: KeyInputWithRepeat, time: SystemTime) {
+    fn send_key(&mut self, key: KeyInput, time: SystemTime) {
         log::debug!("[{}] ← {:?}", self.layer_name, key);
         self.tx
-            .send(KeyRecorderBehavior::SendKey((key, time)))
+            .send(KeyRecorderBehavior::SendKey((key.into(), time)))
             .unwrap();
     }
 }
 
 impl KeyReceiver for KeyWriter {
-    fn send_key(&mut self, key: KeyInputWithRepeat, _: SystemTime) {
+    fn send_key(&mut self, key: KeyInput, _: SystemTime) {
         self.fire_key_input(key.into());
     }
 }
@@ -489,7 +431,7 @@ impl KeyRecorder {
         }
     }
 
-    pub fn send_key(&mut self, key: KeyInputWithRepeat, time: SystemTime) {
+    pub fn send_key(&mut self, key: KeyInput, time: SystemTime) {
         self.first_recorder.send_key(key, time);
     }
 }
