@@ -81,7 +81,6 @@ pub struct SingleHotkeyEntry {
     pub input: KeyInput,
     pub output: Vec<KeyInput>,
     pub transition: Option<Transition>,
-    pub input_canceler: Vec<KeyInput>,
 }
 
 #[derive(PartialEq, Eq, Clone)]
@@ -119,8 +118,8 @@ impl fmt::Debug for SingleHotkeyEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{:?}, {:?}, {:?}, {:?}, {:?}",
-            self.cond, self.input, self.output, self.transition, self.input_canceler
+            "{:?}, {:?}, {:?}, {:?}",
+            self.cond, self.input, self.output, self.transition,
         )
     }
 }
@@ -150,7 +149,6 @@ pub struct KeyRecorderUnit {
 pub struct Action {
     pub output_keys: Vec<KeyInput>,
     pub transition: Option<Transition>,
-    pub input_canceler: Vec<KeyInput>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -179,9 +177,6 @@ fn perform_action<T>(
     if let Some(t) = action.transition {
         log::debug!("[{}] state : {} -> {}", layer_name, recorder_state.state, t);
         recorder_state.state = t;
-    }
-    for c in &action.input_canceler {
-        recorder_state.input_canceler.insert(*c);
     }
 }
 
@@ -239,53 +234,49 @@ fn send_key_handler<'a, T>(
 ) where
     T: KeyReceiver,
 {
-    if !recorder_state.input_canceler.remove(&key.into()) {
-        match key {
-            KeyInput(key_name, KeyInputKind::Press)
-                if recorder_info
-                    .pair_input_keys
-                    .contains(&(key_name, recorder_state.state)) =>
-            {
-                match recorder_state.waiting_key {
-                    Some((waiting_key_kind, _)) => {
-                        let key_set = [waiting_key_kind, key_name];
-                        let key_set = key_set.iter().copied().collect::<BTreeSet<Key>>();
-                        if let Some(action) = recorder_info
-                            .pair_hotkeys_map
-                            .get(&(key_set.clone(), recorder_state.state))
-                        {
-                            recorder_state.waiting_key = None;
-                            *pressing_pair = PressingPair {
-                                pair: key_set,
-                                action: Some(action),
-                            };
-                            perform_action(action, time, recorder_info.layer_name, recorder_state);
-                        } else {
-                            fire_key_input(
-                                KeyInput::press(waiting_key_kind),
-                                time,
-                                recorder_info,
-                                recorder_state,
-                            );
-                            recorder_state.waiting_key = Some((key_name, time));
-                            fire_waiting_key_delay((key_name, time), tx.clone());
-                        }
-                    }
-                    _ => {
+    match key {
+        KeyInput(key_name, KeyInputKind::Press)
+            if recorder_info
+                .pair_input_keys
+                .contains(&(key_name, recorder_state.state)) =>
+        {
+            match recorder_state.waiting_key {
+                Some((waiting_key_kind, _)) => {
+                    let key_set = [waiting_key_kind, key_name];
+                    let key_set = key_set.iter().copied().collect::<BTreeSet<Key>>();
+                    if let Some(action) = recorder_info
+                        .pair_hotkeys_map
+                        .get(&(key_set.clone(), recorder_state.state))
+                    {
+                        recorder_state.waiting_key = None;
+                        *pressing_pair = PressingPair {
+                            pair: key_set,
+                            action: Some(action),
+                        };
+                        perform_action(action, time, recorder_info.layer_name, recorder_state);
+                    } else {
+                        fire_key_input(
+                            KeyInput::press(waiting_key_kind),
+                            time,
+                            recorder_info,
+                            recorder_state,
+                        );
                         recorder_state.waiting_key = Some((key_name, time));
                         fire_waiting_key_delay((key_name, time), tx.clone());
                     }
                 }
+                _ => {
+                    recorder_state.waiting_key = Some((key_name, time));
+                    fire_waiting_key_delay((key_name, time), tx.clone());
+                }
             }
-            _ => {
-                pressing_pair.pair.remove(&key.0);
-                fire_waiting_key(recorder_info, recorder_state);
-                fire_key_input(key.into(), time, recorder_info, recorder_state);
-            }
-        };
-    } else {
-        log::debug!("input {:?} canceled", key.0);
-    }
+        }
+        _ => {
+            pressing_pair.pair.remove(&key.0);
+            fire_waiting_key(recorder_info, recorder_state);
+            fire_key_input(key.into(), time, recorder_info, recorder_state);
+        }
+    };
 }
 
 struct KeyRecorderUnitState<T>
@@ -294,7 +285,6 @@ where
 {
     key_receiver: T,
     state: State,
-    input_canceler: HashSet<KeyInput>,
     waiting_key: Option<(Key, SystemTime)>,
 }
 
@@ -331,7 +321,6 @@ impl KeyRecorderUnit {
                             Action {
                                 output_keys,
                                 transition,
-                                input_canceler: Vec::new(),
                             },
                         )
                     },
@@ -346,14 +335,12 @@ impl KeyRecorderUnit {
                          input,
                          output,
                          transition,
-                         input_canceler,
                      }| {
                         (
                             (input, cond),
                             Action {
                                 output_keys: output,
                                 transition,
-                                input_canceler,
                             },
                         )
                     },
@@ -363,7 +350,6 @@ impl KeyRecorderUnit {
             let mut recorder_state = KeyRecorderUnitState {
                 key_receiver,
                 state: 0,
-                input_canceler: HashSet::new(),
                 waiting_key: None,
             };
             let recorder_info = KeyRecorderUnitInfo {
