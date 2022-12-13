@@ -424,6 +424,8 @@ fn config_caps_lock_arrow() -> KeyConfigUnit {
         (4, KEY_J, None, KEY_HOME),
         (4, KEY_K, None, KEY_ESC),
         (4, KEY_L, None, KEY_END),
+        (5, KEY_J, Some(KEY_LEFTMETA), KEY_PAGEUP),
+        (5, KEY_L, Some(KEY_LEFTMETA), KEY_PAGEDOWN),
     ];
     let capslock_side = capslock_side
         .iter()
@@ -444,16 +446,19 @@ fn config_caps_lock_arrow() -> KeyConfigUnit {
         });
     let single_hotkeys: &[(&[State], KeyInput, &[KeyInput], State)] = &[
         (&[0, 1], KeyInput::press(KEY_CAPSLOCK), &[], 1),
-        (&[1, 2, 3, 4], KeyInput::press(KEY_E), &[], 2),
-        (&[1, 2, 3, 4], KeyInput::press(KEY_R), &[], 3),
-        (&[1, 2, 3, 4], KeyInput::press(KEY_F), &[], 4),
+        (&[1, 2, 3, 4, 5], KeyInput::press(KEY_E), &[], 2),
+        (&[1, 2, 3, 4, 5], KeyInput::press(KEY_R), &[], 3),
+        (&[1, 2, 3, 4, 5], KeyInput::press(KEY_F), &[], 4),
+        (&[1, 2, 3, 4, 5], KeyInput::press(KEY_W), &[], 5),
         (&[2], KeyInput::press(KEY_CAPSLOCK), &[], 2),
         (&[3], KeyInput::press(KEY_CAPSLOCK), &[], 3),
         (&[4], KeyInput::press(KEY_CAPSLOCK), &[], 4),
-        (&[0, 1, 2, 3, 4], KeyInput::release(KEY_CAPSLOCK), &[], 0),
+        (&[5], KeyInput::press(KEY_CAPSLOCK), &[], 5),
+        (&[0, 1, 2, 3, 4, 5], KeyInput::release(KEY_CAPSLOCK), &[], 0),
         (&[2], KeyInput::release(KEY_E), &[], 1),
         (&[3], KeyInput::release(KEY_R), &[], 1),
         (&[4], KeyInput::release(KEY_F), &[], 1),
+        (&[5], KeyInput::release(KEY_W), &[], 1),
     ];
     let single_hotkyes = single_hotkeys.iter().flat_map(|(c, i, o, t)| {
         c.iter().map(move |c| SingleHotkeyEntry {
