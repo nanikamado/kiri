@@ -432,13 +432,19 @@ impl<State: Eq + Copy + Debug + Hash + Send + 'static> KeyConfig for KeyConfigUn
 }
 
 impl<State: Eq + Copy + Debug + Hash + Send + 'static> KeyConfigUnit<State> {
-    pub fn add_layer(self, layer: KeyConfigUnit<State>) -> KeyConfigLayer<State> {
+    pub fn add_layer<S: Eq + Copy + Debug + Hash + Send + 'static>(
+        self,
+        layer: KeyConfigUnit<S>,
+    ) -> KeyConfigLayer<S> {
         KeyConfigLayer(layer, Box::new(self))
     }
 }
 
 impl<State: Eq + Copy + Debug + Hash + Send + 'static> KeyConfigLayer<State> {
-    pub fn add_layer(self, layer: KeyConfigUnit<State>) -> KeyConfigLayer<State> {
+    pub fn add_layer<S: Eq + Copy + Debug + Hash + Send + 'static>(
+        self,
+        layer: KeyConfigUnit<S>,
+    ) -> KeyConfigLayer<S> {
         KeyConfigLayer(layer, Box::new(self))
     }
 }
