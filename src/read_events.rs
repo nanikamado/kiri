@@ -2,7 +2,6 @@ use crate::read_keys::{KeyConfig, KeyInput, KeyRecorder};
 use env_logger::Env;
 use evdev::{Device, InputEvent, InputEventKind, Key};
 use std::{
-    hash::Hash,
     process::exit,
     sync::mpsc::{channel, Receiver},
     thread,
@@ -32,7 +31,7 @@ pub fn make_read_channel(devices: impl Iterator<Item = Device>) -> Receiver<Inpu
     rx
 }
 
-pub fn run<State: Eq + Copy + std::fmt::Debug + Hash + Send>(config: KeyConfig<State>) {
+pub fn run(config: impl KeyConfig) {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     let keyboards = get_keyboard_devices().collect::<Vec<_>>();
     if keyboards.is_empty() {

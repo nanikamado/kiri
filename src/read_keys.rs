@@ -411,20 +411,42 @@ pub struct KeyRecorder {
     first_recorder: KeyRecorderUnit,
 }
 
-pub type KeyConfig<State> = Vec<KeyConfigUnit<State>>;
+pub struct KeyConfigLayer<State: Eq + Copy + Debug + Hash + 'static>(
+    KeyConfigUnit<State>,
+    Box<dyn KeyConfig>,
+);
+pub trait KeyConfig {
+    fn to_key_recorder_unit(&self) -> KeyRecorderUnit;
+}
+
+impl<State: Eq + Copy + Debug + Hash + Send + 'static> KeyConfig for KeyConfigLayer<State> {
+    fn to_key_recorder_unit(&self) -> KeyRecorderUnit {
+        KeyRecorderUnit::new(self.0.clone(), self.1.to_key_recorder_unit())
+    }
+}
+
+impl<State: Eq + Copy + Debug + Hash + Send + 'static> KeyConfig for KeyConfigUnit<State> {
+    fn to_key_recorder_unit(&self) -> KeyRecorderUnit {
+        KeyRecorderUnit::new(self.clone(), write_keys::KeyWriter::new())
+    }
+}
+
+impl<State: Eq + Copy + Debug + Hash + Send + 'static> KeyConfigUnit<State> {
+    pub fn add_layer(self, layer: KeyConfigUnit<State>) -> KeyConfigLayer<State> {
+        KeyConfigLayer(layer, Box::new(self))
+    }
+}
+
+impl<State: Eq + Copy + Debug + Hash + Send + 'static> KeyConfigLayer<State> {
+    pub fn add_layer(self, layer: KeyConfigUnit<State>) -> KeyConfigLayer<State> {
+        KeyConfigLayer(layer, Box::new(self))
+    }
+}
 
 impl KeyRecorder {
-    pub fn new<State: Eq + Copy + Debug + Hash + Send + 'static>(
-        key_config: KeyConfig<State>,
-    ) -> Self {
-        let mut key_config = key_config.into_iter().rev();
-        let key_receiver = write_keys::KeyWriter::new();
-        let mut key_receiver = KeyRecorderUnit::new(key_config.next().unwrap(), key_receiver);
-        for conf_unit in key_config {
-            key_receiver = KeyRecorderUnit::new(conf_unit, key_receiver);
-        }
+    pub fn new(key_config: impl KeyConfig) -> Self {
         KeyRecorder {
-            first_recorder: key_receiver,
+            first_recorder: key_config.to_key_recorder_unit(),
         }
     }
 

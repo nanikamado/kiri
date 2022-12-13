@@ -577,10 +577,10 @@ fn config_simple_remap() -> KeyConfigUnit<State> {
 }
 
 fn main() {
-    read_events::run(vec![
-        config_simple_remap(),
-        config_caps_lock_arrow(),
-        config_sands(),
-        mk_config(),
-    ]);
+    read_events::run(
+        config_simple_remap()
+            .add_layer(config_caps_lock_arrow())
+            .add_layer(config_sands())
+            .add_layer(mk_config()),
+    );
 }
