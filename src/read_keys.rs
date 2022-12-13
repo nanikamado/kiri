@@ -2,22 +2,19 @@ use crate::write_keys::{self, KeyWriter};
 use evdev::Key;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::{self, Debug};
+use std::hash::Hash;
 use std::time::SystemTime;
 use std::{
     sync::mpsc::{channel, Sender},
     thread, time,
 };
 
-pub type State = u64;
-
-pub type Transition = u64;
-
 #[derive(PartialEq, Eq, Hash, Clone)]
-pub struct PairHotkeyEntry {
+pub struct PairHotkeyEntry<State: Eq + Copy> {
     pub cond: State,
     pub input: [Key; 2],
     pub output_keys: Vec<KeyInput>,
-    pub transition: Option<Transition>,
+    pub transition: Option<State>,
 }
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
@@ -76,21 +73,22 @@ impl From<i32> for KeyInputKind {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
-pub struct SingleHotkeyEntry {
+pub struct SingleHotkeyEntry<State: Eq + Copy> {
     pub cond: State,
     pub input: KeyInput,
     pub output: Vec<KeyInput>,
-    pub transition: Option<Transition>,
+    pub transition: Option<State>,
 }
 
 #[derive(PartialEq, Eq, Clone)]
-pub struct KeyConfigUnit {
-    pub pair_hotkeys: Vec<PairHotkeyEntry>,
-    pub single_hotkeys: Vec<SingleHotkeyEntry>,
+pub struct KeyConfigUnit<State: Eq + Copy + Debug + Hash + 'static> {
+    pub pair_hotkeys: Vec<PairHotkeyEntry<State>>,
+    pub single_hotkeys: Vec<SingleHotkeyEntry<State>>,
     pub layer_name: &'static str,
+    pub initial_state: State,
 }
 
-impl fmt::Debug for KeyConfigUnit {
+impl<State: Eq + Copy + Debug + Hash + 'static> fmt::Debug for KeyConfigUnit<State> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "pair_hotkeys: ")?;
         for e in &self.pair_hotkeys {
@@ -104,7 +102,7 @@ impl fmt::Debug for KeyConfigUnit {
     }
 }
 
-impl fmt::Debug for PairHotkeyEntry {
+impl<State: Eq + Copy + Debug + Hash> fmt::Debug for PairHotkeyEntry<State> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -114,7 +112,7 @@ impl fmt::Debug for PairHotkeyEntry {
     }
 }
 
-impl fmt::Debug for SingleHotkeyEntry {
+impl<State: Eq + Copy + Debug + Hash> fmt::Debug for SingleHotkeyEntry<State> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -146,45 +144,48 @@ pub struct KeyRecorderUnit {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub struct Action {
+pub struct Action<State: Eq + Copy + Debug + Hash> {
     pub output_keys: Vec<KeyInput>,
-    pub transition: Option<Transition>,
+    pub transition: Option<State>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub struct PressingPair<'a> {
+pub struct PressingPair<'a, State: Eq + Copy + Debug + Hash> {
     pub pair: BTreeSet<Key>,
-    pub action: Option<&'a Action>,
+    pub action: Option<&'a Action<State>>,
 }
 
-trait KeyReceiver: Send {
+pub trait KeyReceiver: Send {
     fn send_key(&mut self, key: KeyInput, time: SystemTime);
 }
 
-fn perform_action<T>(
-    action: &Action,
+fn perform_action<T, State: Eq + Copy + Debug + Hash>(
+    action: &Action<State>,
     time: SystemTime,
     layer_name: &'static str,
-    recorder_state: &mut KeyRecorderUnitState<T>,
+    recorder_state: &mut KeyRecorderUnitState<T, State>,
 ) where
     T: KeyReceiver,
 {
     for output_key in &action.output_keys {
-        recorder_state
-            .key_receiver
-            .send_key((*output_key).into(), time);
+        recorder_state.key_receiver.send_key(*output_key, time);
     }
     if let Some(t) = action.transition {
-        log::debug!("[{}] state : {} -> {}", layer_name, recorder_state.state, t);
+        log::debug!(
+            "[{}] state : {:?} -> {:?}",
+            layer_name,
+            recorder_state.state,
+            t
+        );
         recorder_state.state = t;
     }
 }
 
-fn fire_key_input<T>(
+fn fire_key_input<T, State: Eq + Copy + Debug + Hash>(
     key: KeyInput,
     time: SystemTime,
-    recorder_info: &KeyRecorderUnitInfo,
-    recorder_state: &mut KeyRecorderUnitState<T>,
+    recorder_info: &KeyRecorderUnitInfo<State>,
+    recorder_state: &mut KeyRecorderUnitState<T, State>,
 ) where
     T: KeyReceiver,
 {
@@ -194,15 +195,15 @@ fn fire_key_input<T>(
     {
         perform_action(action, time, recorder_info.layer_name, recorder_state);
     } else {
-        recorder_state.key_receiver.send_key(key.into(), time);
+        recorder_state.key_receiver.send_key(key, time);
     }
 }
 
-fn fire_specific_waiting_key_handler<T>(
+fn fire_specific_waiting_key_handler<T, State: Eq + Copy + Debug + Hash>(
     key: Key,
     time: SystemTime,
-    recorder_info: &KeyRecorderUnitInfo,
-    recorder_state: &mut KeyRecorderUnitState<T>,
+    recorder_info: &KeyRecorderUnitInfo<State>,
+    recorder_state: &mut KeyRecorderUnitState<T, State>,
 ) where
     T: KeyReceiver,
 {
@@ -212,9 +213,9 @@ fn fire_specific_waiting_key_handler<T>(
     }
 }
 
-fn fire_waiting_key<T>(
-    recorder_info: &KeyRecorderUnitInfo,
-    recorder_state: &mut KeyRecorderUnitState<T>,
+fn fire_waiting_key<T, State: Eq + Copy + Debug + Hash>(
+    recorder_info: &KeyRecorderUnitInfo<State>,
+    recorder_state: &mut KeyRecorderUnitState<T, State>,
 ) where
     T: KeyReceiver,
 {
@@ -224,12 +225,12 @@ fn fire_waiting_key<T>(
     }
 }
 
-fn send_key_handler<'a, T>(
+fn send_key_handler<'a, T, State: Eq + Copy + Debug + Hash>(
     key: KeyInput,
     time: SystemTime,
-    recorder_info: &'a KeyRecorderUnitInfo,
-    pressing_pair: &mut PressingPair<'a>,
-    recorder_state: &mut KeyRecorderUnitState<T>,
+    recorder_info: &'a KeyRecorderUnitInfo<State>,
+    pressing_pair: &mut PressingPair<'a, State>,
+    recorder_state: &mut KeyRecorderUnitState<T, State>,
     tx: &Sender<KeyRecorderBehavior>,
 ) where
     T: KeyReceiver,
@@ -274,39 +275,44 @@ fn send_key_handler<'a, T>(
         _ => {
             pressing_pair.pair.remove(&key.0);
             fire_waiting_key(recorder_info, recorder_state);
-            fire_key_input(key.into(), time, recorder_info, recorder_state);
+            fire_key_input(key, time, recorder_info, recorder_state);
         }
     };
 }
 
-struct KeyRecorderUnitState<T>
+struct KeyRecorderUnitState<T, State>
 where
     T: KeyReceiver,
+    State: Eq + Copy + Debug + Hash,
 {
     key_receiver: T,
     state: State,
     waiting_key: Option<(Key, SystemTime)>,
 }
 
-struct KeyRecorderUnitInfo {
-    pair_hotkeys_map: HashMap<(BTreeSet<Key>, State), Action>,
+struct KeyRecorderUnitInfo<State: Eq + Copy + Debug + Hash> {
+    pair_hotkeys_map: HashMap<(BTreeSet<Key>, State), Action<State>>,
     pair_input_keys: HashSet<(Key, State)>,
-    single_hotkeys_map: HashMap<(KeyInput, State), Action>,
+    single_hotkeys_map: HashMap<(KeyInput, State), Action<State>>,
     layer_name: &'static str,
 }
 
 impl KeyRecorderUnit {
-    fn new(key_config: KeyConfigUnit, key_receiver: impl KeyReceiver + 'static) -> KeyRecorderUnit {
+    fn new<State: Eq + Copy + Debug + Hash + Send + 'static>(
+        key_config: KeyConfigUnit<State>,
+        key_receiver: impl KeyReceiver + 'static,
+    ) -> KeyRecorderUnit {
         let (tx, rx) = channel();
         let tx_clone = tx.clone();
         let layer_name = key_config.layer_name;
+        let initial_state = key_config.initial_state;
         thread::spawn(move || {
             let pair_input_keys: HashSet<(Key, State)> = key_config
                 .pair_hotkeys
                 .iter()
                 .flat_map(|PairHotkeyEntry { cond, input, .. }| input.map(move |i| (i, *cond)))
                 .collect();
-            let pair_hotkeys_map: HashMap<(BTreeSet<Key>, State), Action> = key_config
+            let pair_hotkeys_map: HashMap<(BTreeSet<Key>, State), Action<State>> = key_config
                 .pair_hotkeys
                 .into_iter()
                 .map(
@@ -326,7 +332,7 @@ impl KeyRecorderUnit {
                     },
                 )
                 .collect();
-            let single_hotkeys_map: HashMap<(KeyInput, State), Action> = key_config
+            let single_hotkeys_map: HashMap<(KeyInput, State), Action<State>> = key_config
                 .single_hotkeys
                 .into_iter()
                 .map(
@@ -346,10 +352,13 @@ impl KeyRecorderUnit {
                     },
                 )
                 .collect();
-            let mut pressing_pair: PressingPair = Default::default();
+            let mut pressing_pair: PressingPair<State> = PressingPair {
+                pair: Default::default(),
+                action: Default::default(),
+            };
             let mut recorder_state = KeyRecorderUnitState {
                 key_receiver,
-                state: 0,
+                state: initial_state,
                 waiting_key: None,
             };
             let recorder_info = KeyRecorderUnitInfo {
@@ -387,14 +396,14 @@ impl KeyReceiver for KeyRecorderUnit {
     fn send_key(&mut self, key: KeyInput, time: SystemTime) {
         log::debug!("[{}] ← {:?}", self.layer_name, key);
         self.tx
-            .send(KeyRecorderBehavior::SendKey((key.into(), time)))
+            .send(KeyRecorderBehavior::SendKey((key, time)))
             .unwrap();
     }
 }
 
 impl KeyReceiver for KeyWriter {
     fn send_key(&mut self, key: KeyInput, _: SystemTime) {
-        self.fire_key_input(key.into());
+        self.fire_key_input(key);
     }
 }
 
@@ -402,10 +411,12 @@ pub struct KeyRecorder {
     first_recorder: KeyRecorderUnit,
 }
 
-pub type KeyConfig = Vec<KeyConfigUnit>;
+pub type KeyConfig<State> = Vec<KeyConfigUnit<State>>;
 
 impl KeyRecorder {
-    pub fn new(key_config: KeyConfig) -> Self {
+    pub fn new<State: Eq + Copy + Debug + Hash + Send + 'static>(
+        key_config: KeyConfig<State>,
+    ) -> Self {
         let mut key_config = key_config.into_iter().rev();
         let key_receiver = write_keys::KeyWriter::new();
         let mut key_receiver = KeyRecorderUnit::new(key_config.next().unwrap(), key_receiver);

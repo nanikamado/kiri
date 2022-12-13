@@ -1,12 +1,23 @@
 use evdev::Key;
 use evdev_keys::*;
-use read_keys::{KeyConfigUnit, KeyInput, PairHotkeyEntry, SingleHotkeyEntry, State, Transition};
+use read_keys::{KeyConfigUnit, KeyInput, PairHotkeyEntry, SingleHotkeyEntry};
 
 mod read_events;
 mod read_keys;
 mod write_keys;
 
-fn mk_config() -> KeyConfigUnit {
+// #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+// enum StateGeta {
+//     Normal,
+//     JpInput,
+//     JpInputWithModifires,
+// }
+
+type State = &'static str;
+
+#[allow(clippy::type_complexity)]
+fn mk_config() -> KeyConfigUnit<State> {
+    // use StateGeta::*;
     // 0  : normal
     // 7   : jp input
     // 1   : jp input with modifiers
@@ -142,32 +153,32 @@ fn mk_config() -> KeyConfigUnit {
         (&[KEY_V], &[KEY_R, KEY_U]),
         (&[KEY_B], &[KEY_T, KEY_U]),
     ];
-    let mut singeta_config: Vec<(&[State], &[Key], &[Key], Option<Transition>)> = singeta_config
+    let mut singeta_config: Vec<(&[State], &[Key], &[Key], Option<State>)> = singeta_config
         .iter()
-        .map(|(i, o)| -> (&[State], _, _, _) { (&[7], *i, *o, None) })
+        .map(|(i, o)| -> (&[State], _, _, _) { (&["JpInput"], *i, *o, None) })
         .collect();
-    let key_config_r: &[(&[State], &[Key], &[Key], Option<Transition>)] = &[
-        (&[7], &[KEY_R, KEY_G], &[KEY_SLASH], None),
+    let key_config_r: &[(&[State], &[Key], &[Key], Option<State>)] = &[
+        (&["JpInput"], &[KEY_R, KEY_G], &[KEY_SLASH], None),
         (
-            &[7],
+            &["JpInput"],
             &[KEY_H, KEY_J],
             &[KEY_RIGHTBRACE, KEY_BACKSLASH, KEY_RIGHT],
             None,
         ),
-        (&[0], &[KEY_J, KEY_K], &[KEY_RIGHTBRACE], None),
-        (&[0], &[KEY_D, KEY_SEMICOLON], &[KEY_END], None),
-        (&[0], &[KEY_A, KEY_K], &[KEY_HOME], None),
-        (&[0], &[KEY_F, KEY_SEMICOLON], &[KEY_END], None),
-        (&[0], &[KEY_A, KEY_J], &[KEY_HOME], None),
+        (&["Normal"], &[KEY_J, KEY_K], &[KEY_RIGHTBRACE], None),
+        (&["Normal"], &[KEY_D, KEY_SEMICOLON], &[KEY_END], None),
+        (&["Normal"], &[KEY_A, KEY_K], &[KEY_HOME], None),
+        (&["Normal"], &[KEY_F, KEY_SEMICOLON], &[KEY_END], None),
+        (&["Normal"], &[KEY_A, KEY_J], &[KEY_HOME], None),
     ];
     let key_config_r = {
         let mut k = key_config_r.to_vec();
         k.append(&mut singeta_config);
         k
     };
-    let pair_keys_with_modifiers_config: &[(&[State], [Key; 2], Vec<_>, Option<Transition>)] = &[
+    let pair_keys_with_modifiers_config: &[(&[State], [Key; 2], Vec<_>, Option<State>)] = &[
         (
-            &[0, 7],
+            &["Normal", "JpInput"],
             [KEY_J, KEY_N],
             vec![
                 KeyInput::press(KEY_LEFTSHIFT),
@@ -178,7 +189,7 @@ fn mk_config() -> KeyConfigUnit {
             None,
         ),
         (
-            &[0, 7],
+            &["Normal", "JpInput"],
             [KEY_F, KEY_V],
             vec![
                 KeyInput::press(KEY_LEFTSHIFT),
@@ -189,7 +200,7 @@ fn mk_config() -> KeyConfigUnit {
             None,
         ),
         (
-            &[0, 7],
+            &["Normal", "JpInput"],
             [KEY_F, KEY_B],
             vec![
                 KeyInput::press(KEY_LEFTSHIFT),
@@ -200,7 +211,7 @@ fn mk_config() -> KeyConfigUnit {
             None,
         ),
         (
-            &[7],
+            &["JpInput"],
             [KEY_F, KEY_G],
             vec![
                 KeyInput::press(KEY_LEFTSHIFT),
@@ -213,7 +224,7 @@ fn mk_config() -> KeyConfigUnit {
             None,
         ),
         (
-            &[0],
+            &["Normal"],
             [KEY_D, KEY_F],
             vec![
                 KeyInput::press(KEY_LEFTSHIFT),
@@ -224,7 +235,7 @@ fn mk_config() -> KeyConfigUnit {
             None,
         ),
         (
-            &[0],
+            &["Normal"],
             [KEY_F, KEY_G],
             vec![
                 KeyInput::press(KEY_LEFTSHIFT),
@@ -235,7 +246,7 @@ fn mk_config() -> KeyConfigUnit {
             None,
         ),
         (
-            &[0],
+            &["Normal"],
             [KEY_K, KEY_L],
             vec![
                 KeyInput::press(KEY_LEFTSHIFT),
@@ -246,7 +257,7 @@ fn mk_config() -> KeyConfigUnit {
             None,
         ),
         (
-            &[0],
+            &["Normal"],
             [KEY_E, KEY_O],
             vec![
                 KeyInput::press(KEY_LEFTSHIFT),
@@ -257,7 +268,7 @@ fn mk_config() -> KeyConfigUnit {
             None,
         ),
         (
-            &[0],
+            &["Normal"],
             [KEY_W, KEY_I],
             vec![
                 KeyInput::press(KEY_LEFTSHIFT),
@@ -268,7 +279,7 @@ fn mk_config() -> KeyConfigUnit {
             None,
         ),
         (
-            &[0],
+            &["Normal"],
             [KEY_F, KEY_J],
             vec![
                 KeyInput::press(KEY_LEFTMETA),
@@ -276,10 +287,10 @@ fn mk_config() -> KeyConfigUnit {
                 KeyInput::release(KEY_SPACE),
                 KeyInput::release(KEY_LEFTMETA),
             ],
-            Some(7),
+            Some("JpInput"),
         ),
         (
-            &[7],
+            &["JpInput"],
             [KEY_F, KEY_J],
             vec![
                 KeyInput::press(KEY_LEFTCTRL),
@@ -291,10 +302,10 @@ fn mk_config() -> KeyConfigUnit {
                 KeyInput::release(KEY_SPACE),
                 KeyInput::release(KEY_LEFTMETA),
             ],
-            Some(0),
+            Some("Normal"),
         ),
         (
-            &[0],
+            &["Normal"],
             [KEY_D, KEY_S],
             vec![
                 KeyInput::press(KEY_LEFTMETA),
@@ -302,10 +313,10 @@ fn mk_config() -> KeyConfigUnit {
                 KeyInput::release(KEY_SPACE),
                 KeyInput::release(KEY_LEFTMETA),
             ],
-            Some(7),
+            Some("JpInput"),
         ),
         (
-            &[7],
+            &["JpInput"],
             [KEY_D, KEY_S],
             vec![
                 KeyInput::press(KEY_LEFTCTRL),
@@ -317,7 +328,7 @@ fn mk_config() -> KeyConfigUnit {
                 KeyInput::release(KEY_SPACE),
                 KeyInput::release(KEY_LEFTMETA),
             ],
-            Some(0),
+            Some("Normal"),
         ),
     ];
     let modifires = [
@@ -334,8 +345,16 @@ fn mk_config() -> KeyConfigUnit {
         .iter()
         .flat_map(|key| {
             [
-                (7, KeyInput::press(*key), Some(1)),
-                (1, KeyInput::release(*key), Some(7)),
+                (
+                    "JpInput",
+                    KeyInput::press(*key),
+                    Some("JpInputWithModifires"),
+                ),
+                (
+                    "JpInputWithModifires",
+                    KeyInput::release(*key),
+                    Some("JpInput"),
+                ),
             ]
             .map(|(c, i, t)| SingleHotkeyEntry {
                 cond: c,
@@ -397,35 +416,36 @@ fn mk_config() -> KeyConfigUnit {
             .chain(modifiers_trans)
             .collect(),
         layer_name: "big config",
+        initial_state: "Normal",
     }
 }
 
-fn config_caps_lock_arrow() -> KeyConfigUnit {
+fn config_caps_lock_arrow() -> KeyConfigUnit<State> {
     let capslock_side = [
-        (1, KEY_I, None, KEY_UP),
-        (1, KEY_J, None, KEY_LEFT),
-        (1, KEY_K, None, KEY_DOWN),
-        (1, KEY_L, None, KEY_RIGHT),
-        (1, KEY_ENTER, Some(KEY_LEFTCTRL), KEY_S),
-        (1, KEY_N, Some(KEY_LEFTCTRL), KEY_C),
-        (1, KEY_M, Some(KEY_LEFTCTRL), KEY_V),
-        (1, KEY_U, Some(KEY_LEFTCTRL), KEY_Z),
-        (1, KEY_O, Some(KEY_LEFTCTRL), KEY_Y),
-        (1, KEY_DOT, Some(KEY_LEFTCTRL), KEY_DOT),
-        (2, KEY_I, Some(KEY_LEFTCTRL), KEY_UP),
-        (2, KEY_J, Some(KEY_LEFTCTRL), KEY_LEFT),
-        (2, KEY_K, Some(KEY_LEFTCTRL), KEY_DOWN),
-        (2, KEY_L, Some(KEY_LEFTCTRL), KEY_RIGHT),
-        (3, KEY_I, Some(KEY_LEFTMETA), KEY_I),
-        (3, KEY_J, Some(KEY_LEFTMETA), KEY_J),
-        (3, KEY_K, Some(KEY_LEFTMETA), KEY_K),
-        (3, KEY_L, Some(KEY_LEFTMETA), KEY_L),
-        (4, KEY_I, None, KEY_ESC),
-        (4, KEY_J, None, KEY_HOME),
-        (4, KEY_K, None, KEY_ESC),
-        (4, KEY_L, None, KEY_END),
-        (5, KEY_J, Some(KEY_LEFTMETA), KEY_PAGEUP),
-        (5, KEY_L, Some(KEY_LEFTMETA), KEY_PAGEDOWN),
+        ("1", KEY_I, None, KEY_UP),
+        ("1", KEY_J, None, KEY_LEFT),
+        ("1", KEY_K, None, KEY_DOWN),
+        ("1", KEY_L, None, KEY_RIGHT),
+        ("1", KEY_ENTER, Some(KEY_LEFTCTRL), KEY_S),
+        ("1", KEY_N, Some(KEY_LEFTCTRL), KEY_C),
+        ("1", KEY_M, Some(KEY_LEFTCTRL), KEY_V),
+        ("1", KEY_U, Some(KEY_LEFTCTRL), KEY_Z),
+        ("1", KEY_O, Some(KEY_LEFTCTRL), KEY_Y),
+        ("1", KEY_DOT, Some(KEY_LEFTCTRL), KEY_DOT),
+        ("2", KEY_I, Some(KEY_LEFTCTRL), KEY_UP),
+        ("2", KEY_J, Some(KEY_LEFTCTRL), KEY_LEFT),
+        ("2", KEY_K, Some(KEY_LEFTCTRL), KEY_DOWN),
+        ("2", KEY_L, Some(KEY_LEFTCTRL), KEY_RIGHT),
+        ("3", KEY_I, Some(KEY_LEFTMETA), KEY_I),
+        ("3", KEY_J, Some(KEY_LEFTMETA), KEY_J),
+        ("3", KEY_K, Some(KEY_LEFTMETA), KEY_K),
+        ("3", KEY_L, Some(KEY_LEFTMETA), KEY_L),
+        ("4", KEY_I, None, KEY_ESC),
+        ("4", KEY_J, None, KEY_HOME),
+        ("4", KEY_K, None, KEY_ESC),
+        ("4", KEY_L, None, KEY_END),
+        ("5", KEY_J, Some(KEY_LEFTMETA), KEY_PAGEUP),
+        ("5", KEY_L, Some(KEY_LEFTMETA), KEY_PAGEDOWN),
     ];
     let capslock_side = capslock_side
         .iter()
@@ -445,20 +465,25 @@ fn config_caps_lock_arrow() -> KeyConfigUnit {
             transition: None,
         });
     let single_hotkeys: &[(&[State], KeyInput, &[KeyInput], State)] = &[
-        (&[0, 1], KeyInput::press(KEY_CAPSLOCK), &[], 1),
-        (&[1, 2, 3, 4, 5], KeyInput::press(KEY_E), &[], 2),
-        (&[1, 2, 3, 4, 5], KeyInput::press(KEY_R), &[], 3),
-        (&[1, 2, 3, 4, 5], KeyInput::press(KEY_F), &[], 4),
-        (&[1, 2, 3, 4, 5], KeyInput::press(KEY_W), &[], 5),
-        (&[2], KeyInput::press(KEY_CAPSLOCK), &[], 2),
-        (&[3], KeyInput::press(KEY_CAPSLOCK), &[], 3),
-        (&[4], KeyInput::press(KEY_CAPSLOCK), &[], 4),
-        (&[5], KeyInput::press(KEY_CAPSLOCK), &[], 5),
-        (&[0, 1, 2, 3, 4, 5], KeyInput::release(KEY_CAPSLOCK), &[], 0),
-        (&[2], KeyInput::release(KEY_E), &[], 1),
-        (&[3], KeyInput::release(KEY_R), &[], 1),
-        (&[4], KeyInput::release(KEY_F), &[], 1),
-        (&[5], KeyInput::release(KEY_W), &[], 1),
+        (&["0", "1"], KeyInput::press(KEY_CAPSLOCK), &[], "1"),
+        (&["1", "2", "3", "4", "5"], KeyInput::press(KEY_E), &[], "2"),
+        (&["1", "2", "3", "4", "5"], KeyInput::press(KEY_R), &[], "3"),
+        (&["1", "2", "3", "4", "5"], KeyInput::press(KEY_F), &[], "4"),
+        (&["1", "2", "3", "4", "5"], KeyInput::press(KEY_W), &[], "5"),
+        (&["2"], KeyInput::press(KEY_CAPSLOCK), &[], "2"),
+        (&["3"], KeyInput::press(KEY_CAPSLOCK), &[], "3"),
+        (&["4"], KeyInput::press(KEY_CAPSLOCK), &[], "4"),
+        (&["5"], KeyInput::press(KEY_CAPSLOCK), &[], "5"),
+        (
+            &["0", "1", "2", "3", "4", "5"],
+            KeyInput::release(KEY_CAPSLOCK),
+            &[],
+            "0",
+        ),
+        (&["2"], KeyInput::release(KEY_E), &[], "1"),
+        (&["3"], KeyInput::release(KEY_R), &[], "1"),
+        (&["4"], KeyInput::release(KEY_F), &[], "1"),
+        (&["5"], KeyInput::release(KEY_W), &[], "1"),
     ];
     let single_hotkyes = single_hotkeys.iter().flat_map(|(c, i, o, t)| {
         c.iter().map(move |c| SingleHotkeyEntry {
@@ -472,33 +497,35 @@ fn config_caps_lock_arrow() -> KeyConfigUnit {
         pair_hotkeys: Vec::new(),
         single_hotkeys: single_hotkyes.chain(capslock_side).collect(),
         layer_name: "caps lock arrows",
+        initial_state: "0",
     }
 }
 
-fn config_sands() -> KeyConfigUnit {
-    let config: &[(&[u64], KeyInput, &[KeyInput], Option<u64>)] = &[
+fn config_sands() -> KeyConfigUnit<State> {
+    #[allow(clippy::type_complexity)]
+    let config: &[(&[State], KeyInput, &[KeyInput], Option<State>)] = &[
         (
-            &[0],
+            &["0"],
             KeyInput::press(KEY_SPACE),
             &[KeyInput::press(KEY_LEFTSHIFT)],
-            Some(1),
+            Some("1"),
         ),
-        (&[1, 2], KeyInput::press(KEY_SPACE), &[], None),
+        (&["1", "2"], KeyInput::press(KEY_SPACE), &[], None),
         (
-            &[1],
+            &["1"],
             KeyInput::release(KEY_SPACE),
             &[
                 KeyInput::release(KEY_LEFTSHIFT),
                 KeyInput::press(KEY_SPACE),
                 KeyInput::release(KEY_SPACE),
             ],
-            Some(0),
+            Some("0"),
         ),
         (
-            &[2],
+            &["2"],
             KeyInput::release(KEY_SPACE),
             &[KeyInput::release(KEY_LEFTSHIFT)],
-            Some(0),
+            Some("0"),
         ),
     ];
     let config = config.iter().flat_map(|(cs, i, o, t)| {
@@ -512,38 +539,40 @@ fn config_sands() -> KeyConfigUnit {
     let config2 = all_keys()
         .filter(|k| *k != KEY_SPACE)
         .map(|k| SingleHotkeyEntry {
-            cond: 1,
+            cond: "1",
             input: KeyInput::press(k),
             output: vec![KeyInput::press(k)],
-            transition: Some(2),
+            transition: Some("2"),
         });
     KeyConfigUnit {
         pair_hotkeys: Vec::new(),
         single_hotkeys: config.chain(config2).collect(),
         layer_name: "SandS",
+        initial_state: "0",
     }
 }
 
-fn config_simple_remap() -> KeyConfigUnit {
+fn config_simple_remap() -> KeyConfigUnit<State> {
     let key_config_r: &[(Key, Key)] = &[(KEY_HENKAN, KEY_ENTER), (KEY_MUHENKAN, KEY_BACKSPACE)];
     KeyConfigUnit {
         pair_hotkeys: Vec::new(),
         single_hotkeys: key_config_r
             .iter()
             .map(|(i, o)| SingleHotkeyEntry {
-                cond: 0,
+                cond: "0",
                 input: KeyInput::press(*i),
                 output: vec![KeyInput::press(*o)],
                 transition: None,
             })
             .chain(key_config_r.iter().map(|(i, o)| SingleHotkeyEntry {
-                cond: 0,
+                cond: "0",
                 input: KeyInput::release(*i),
                 output: vec![KeyInput::release(*o)],
                 transition: None,
             }))
             .collect(),
         layer_name: "simple remap",
+        initial_state: "0",
     }
 }
 
