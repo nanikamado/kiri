@@ -411,15 +411,18 @@ pub struct KeyRecorder {
     first_recorder: KeyRecorderUnit,
 }
 
-pub struct KeyConfigLayer<State: Eq + Copy + Debug + Hash + 'static>(
+pub struct KeyConfigLayer<State: Eq + Copy + Debug + Hash + 'static, Tail>(
     KeyConfigUnit<State>,
-    Box<dyn KeyConfig>,
+    Tail,
 );
+
 pub trait KeyConfig {
     fn to_key_recorder_unit(&self) -> KeyRecorderUnit;
 }
 
-impl<State: Eq + Copy + Debug + Hash + Send + 'static> KeyConfig for KeyConfigLayer<State> {
+impl<State: Eq + Copy + Debug + Hash + Send + 'static, T: KeyConfig> KeyConfig
+    for KeyConfigLayer<State, T>
+{
     fn to_key_recorder_unit(&self) -> KeyRecorderUnit {
         KeyRecorderUnit::new(self.0.clone(), self.1.to_key_recorder_unit())
     }
@@ -428,24 +431,6 @@ impl<State: Eq + Copy + Debug + Hash + Send + 'static> KeyConfig for KeyConfigLa
 impl<State: Eq + Copy + Debug + Hash + Send + 'static> KeyConfig for KeyConfigUnit<State> {
     fn to_key_recorder_unit(&self) -> KeyRecorderUnit {
         KeyRecorderUnit::new(self.clone(), write_keys::KeyWriter::new())
-    }
-}
-
-impl<State: Eq + Copy + Debug + Hash + Send + 'static> KeyConfigUnit<State> {
-    pub fn add_layer<S: Eq + Copy + Debug + Hash + Send + 'static>(
-        self,
-        layer: KeyConfigUnit<S>,
-    ) -> KeyConfigLayer<S> {
-        KeyConfigLayer(layer, Box::new(self))
-    }
-}
-
-impl<State: Eq + Copy + Debug + Hash + Send + 'static> KeyConfigLayer<State> {
-    pub fn add_layer<S: Eq + Copy + Debug + Hash + Send + 'static>(
-        self,
-        layer: KeyConfigUnit<S>,
-    ) -> KeyConfigLayer<S> {
-        KeyConfigLayer(layer, Box::new(self))
     }
 }
 
@@ -458,5 +443,39 @@ impl KeyRecorder {
 
     pub fn send_key(&mut self, key: KeyInput, time: SystemTime) {
         self.first_recorder.send_key(key, time);
+    }
+}
+
+pub trait AddLayer {
+    type LayerAdded<A>;
+
+    fn add_layer<T: AddLayer>(self, tail: T) -> Self::LayerAdded<T>;
+}
+
+impl<State: Eq + Copy + Debug + Hash + 'static, Tail: AddLayer> AddLayer
+    for KeyConfigLayer<State, Tail>
+{
+    type LayerAdded<A> = KeyConfigLayer<State, Tail::LayerAdded<A>>;
+
+    fn add_layer<T: AddLayer>(self, tail: T) -> Self::LayerAdded<T> {
+        KeyConfigLayer(self.0, self.1.add_layer(tail))
+    }
+}
+
+impl<State: Eq + Copy + Debug + Hash + 'static> AddLayer for KeyConfigUnit<State> {
+    type LayerAdded<A> = KeyConfigLayer<State, A>;
+
+    fn add_layer<T: AddLayer>(self, tail: T) -> Self::LayerAdded<T> {
+        KeyConfigLayer(self, tail)
+    }
+}
+
+pub struct EmptyCinfig;
+
+impl AddLayer for EmptyCinfig {
+    type LayerAdded<A> = A;
+
+    fn add_layer<T: AddLayer>(self, tail: T) -> Self::LayerAdded<T> {
+        tail
     }
 }

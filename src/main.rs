@@ -1,7 +1,9 @@
 use evdev::Key;
 use evdev_keys::*;
 use read_events::KeyConfigRun;
-use read_keys::{KeyConfigUnit, KeyInput, PairHotkeyEntry, SingleHotkeyEntry};
+use read_keys::{
+    AddLayer, EmptyCinfig, KeyConfigUnit, KeyInput, PairHotkeyEntry, SingleHotkeyEntry,
+};
 
 mod read_events;
 mod read_keys;
@@ -443,8 +445,8 @@ fn config_caps_lock_arrow() -> KeyConfigUnit<StateCapsLock> {
         (Clf, KEY_J, None, KEY_HOME),
         (Clf, KEY_K, None, KEY_ESC),
         (Clf, KEY_L, None, KEY_END),
-        (Clr, KEY_J, Some(KEY_LEFTMETA), KEY_PAGEUP),
-        (Clr, KEY_L, Some(KEY_LEFTMETA), KEY_PAGEDOWN),
+        (Clw, KEY_J, Some(KEY_LEFTMETA), KEY_PAGEUP),
+        (Clw, KEY_L, Some(KEY_LEFTMETA), KEY_PAGEDOWN),
     ];
     let capslock_side = capslock_side
         .iter()
@@ -584,7 +586,8 @@ fn config_simple_remap() -> KeyConfigUnit<()> {
 }
 
 fn main() {
-    config_simple_remap()
+    EmptyCinfig
+        .add_layer(config_simple_remap())
         .add_layer(config_caps_lock_arrow())
         .add_layer(config_sands())
         .add_layer(mk_config())
