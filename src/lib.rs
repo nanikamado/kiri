@@ -1,5 +1,10 @@
-use crate::read_keys::{KeyConfig, KeyInput, KeyRecorder};
-use env_logger::Env;
+mod read_keys;
+mod write_keys;
+
+pub use crate::read_keys::{
+    AddLayer, EmptyCinfig, KeyConfigUnit, KeyInput, PairHotkeyEntry, SingleHotkeyEntry,
+};
+use crate::read_keys::{KeyConfig, KeyReceiver};
 use evdev::{Device, InputEvent, InputEventKind, Key};
 use std::{
     process::exit,
@@ -7,7 +12,7 @@ use std::{
     thread,
 };
 
-pub fn get_keyboard_devices() -> impl Iterator<Item = Device> {
+fn get_keyboard_devices() -> impl Iterator<Item = Device> {
     evdev::enumerate().filter(|device| {
         device.supported_keys().map_or(false, |supported_keys| {
             supported_keys.contains(Key::KEY_A)
@@ -17,7 +22,7 @@ pub fn get_keyboard_devices() -> impl Iterator<Item = Device> {
     })
 }
 
-pub fn make_read_channel(devices: impl Iterator<Item = Device>) -> Receiver<InputEvent> {
+fn make_read_channel(devices: impl Iterator<Item = Device>) -> Receiver<InputEvent> {
     let (tx, rx) = channel();
     for mut d in devices {
         let tx = tx.clone();
@@ -37,13 +42,12 @@ pub trait KeyConfigRun {
 
 impl<T: KeyConfig> KeyConfigRun for T {
     fn run(self) {
-        env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
         let keyboards = get_keyboard_devices().collect::<Vec<_>>();
         if keyboards.is_empty() {
             eprintln!("keyboard not found");
             exit(1);
         }
-        let mut key_recorder = KeyRecorder::new(self);
+        let mut key_recorder = self.to_key_recorder_unit();
         log::info!("config loaded");
         for input_event in make_read_channel(keyboards.into_iter()) {
             if let InputEventKind::Key(key) = input_event.kind() {

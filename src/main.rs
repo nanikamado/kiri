@@ -1,13 +1,10 @@
+use env_logger::Env;
 use evdev::Key;
 use evdev_keys::*;
-use read_events::KeyConfigRun;
-use read_keys::{
-    AddLayer, EmptyCinfig, KeyConfigUnit, KeyInput, PairHotkeyEntry, SingleHotkeyEntry,
+use kiri::{
+    AddLayer, EmptyCinfig, KeyConfigRun, KeyConfigUnit, KeyInput, PairHotkeyEntry,
+    SingleHotkeyEntry,
 };
-
-mod read_events;
-mod read_keys;
-mod write_keys;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 enum StateGeta {
@@ -586,6 +583,7 @@ fn config_simple_remap() -> KeyConfigUnit<()> {
 }
 
 fn main() {
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     EmptyCinfig
         .add_layer(config_simple_remap())
         .add_layer(config_caps_lock_arrow())
