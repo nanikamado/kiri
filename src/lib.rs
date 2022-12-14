@@ -13,12 +13,16 @@ use std::{
 };
 
 fn get_keyboard_devices() -> impl Iterator<Item = Device> {
-    evdev::enumerate().filter(|device| {
-        device.supported_keys().map_or(false, |supported_keys| {
+    evdev::enumerate().filter_map(|(_, device)| {
+        if device.supported_keys().map_or(false, |supported_keys| {
             supported_keys.contains(Key::KEY_A)
                 && supported_keys.contains(Key::KEY_Z)
                 && supported_keys.contains(Key::KEY_SPACE)
-        })
+        }) {
+            Some(device)
+        } else {
+            None
+        }
     })
 }
 

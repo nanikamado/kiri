@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 libc = "0.2.67"
 log = "0.4.14"
-env_logger = "0.9.0"
-evdev = "0.11.3"
-evdev-keys = { git = "https://github.com/nanikamado/evdev-keys" }
+env_logger = "0.10.0"
+evdev = "0.12.1"
+evdev-keys = { git = "https://github.com/nanikamado/evdev-keys", rev = "a67ea24" }
+rustc-hash = "1.1.0"

@@ -1,6 +1,8 @@
 use crate::write_keys::{self, KeyWriter};
 use evdev::Key;
-use std::collections::{BTreeSet, HashMap, HashSet};
+use rustc_hash::FxHashMap as HashMap;
+use rustc_hash::FxHashSet as HashSet;
+use std::collections::BTreeSet;
 use std::fmt::{self, Debug};
 use std::hash::Hash;
 use std::time::SystemTime;
@@ -130,7 +132,7 @@ enum KeyRecorderBehavior {
     SendKey((KeyInput, SystemTime)),
 }
 
-fn fire_waiting_key_delay(key: (Key, SystemTime), tx: Sender<KeyRecorderBehavior>) {
+fn fire_waiting_key_with_delay(key: (Key, SystemTime), tx: Sender<KeyRecorderBehavior>) {
     thread::spawn(move || {
         thread::sleep(time::Duration::from_millis(50));
         tx.send(KeyRecorderBehavior::FireSpecificWaitingKey(key))
@@ -246,13 +248,11 @@ fn send_key_handler<'a, T, State: Eq + Copy + Debug + Hash>(
                 Some((waiting_key_kind, _)) => {
                     let key_set = [waiting_key_kind, key_name];
                     let key_set = key_set.iter().copied().collect::<BTreeSet<Key>>();
-                    if let Some(action) = recorder_info
-                        .pair_hotkeys_map
-                        .get(&(key_set.clone(), recorder_state.state))
-                    {
+                    let key_set_state = (key_set, recorder_state.state);
+                    if let Some(action) = recorder_info.pair_hotkeys_map.get(&key_set_state) {
                         recorder_state.waiting_key = None;
                         *pressing_pair = PressingPair {
-                            pair: key_set,
+                            pair: key_set_state.0,
                             action: Some(action),
                         };
                         perform_action(action, time, recorder_info.layer_name, recorder_state);
@@ -264,12 +264,12 @@ fn send_key_handler<'a, T, State: Eq + Copy + Debug + Hash>(
                             recorder_state,
                         );
                         recorder_state.waiting_key = Some((key_name, time));
-                        fire_waiting_key_delay((key_name, time), tx.clone());
+                        fire_waiting_key_with_delay((key_name, time), tx.clone());
                     }
                 }
                 _ => {
                     recorder_state.waiting_key = Some((key_name, time));
-                    fire_waiting_key_delay((key_name, time), tx.clone());
+                    fire_waiting_key_with_delay((key_name, time), tx.clone());
                 }
             }
         }
