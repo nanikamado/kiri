@@ -2,7 +2,6 @@ use crate::write_keys::{self, KeyWriter};
 use evdev::Key;
 use rustc_hash::FxHashMap as HashMap;
 use rustc_hash::FxHashSet as HashSet;
-use std::collections::BTreeSet;
 use std::fmt::{self, Debug};
 use std::hash::Hash;
 use std::time::SystemTime;
@@ -146,15 +145,9 @@ pub struct KeyRecorder {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub struct Action<State> {
-    pub output_keys: Vec<KeyInput>,
-    pub transition: State,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
-pub struct PressingPair<'a, State> {
-    pub pair: BTreeSet<Key>,
-    pub action: Option<&'a Action<State>>,
+struct Action<State> {
+    output_keys: Vec<KeyInput>,
+    transition: State,
 }
 
 pub trait KeyReceiver: Send {
@@ -232,7 +225,6 @@ fn send_key_handler<'a, T, State: Eq + Copy + Debug + Hash>(
     key: KeyInput,
     time: SystemTime,
     recorder_info: &'a KeyRecorderUnitInfo<State>,
-    pressing_pair: &mut PressingPair<'a, State>,
     recorder_state: &mut KeyRecorderUnitState<T, State>,
     tx: &Sender<KeyRecorderBehavior>,
 ) where
@@ -246,15 +238,11 @@ fn send_key_handler<'a, T, State: Eq + Copy + Debug + Hash>(
         {
             match recorder_state.waiting_key {
                 Some((waiting_key_kind, _)) => {
-                    let key_set = [waiting_key_kind, key_name];
-                    let key_set = key_set.iter().copied().collect::<BTreeSet<Key>>();
+                    let mut key_set = [waiting_key_kind, key_name];
+                    key_set.sort_unstable();
                     let key_set_state = (key_set, recorder_state.state);
                     if let Some(action) = recorder_info.pair_hotkeys_map.get(&key_set_state) {
                         recorder_state.waiting_key = None;
-                        *pressing_pair = PressingPair {
-                            pair: key_set_state.0,
-                            action: Some(action),
-                        };
                         perform_action(action, time, recorder_info.layer_name, recorder_state);
                     } else {
                         fire_key_input(
@@ -274,7 +262,6 @@ fn send_key_handler<'a, T, State: Eq + Copy + Debug + Hash>(
             }
         }
         _ => {
-            pressing_pair.pair.remove(&key.0);
             fire_waiting_key(recorder_info, recorder_state);
             fire_key_input(key, time, recorder_info, recorder_state);
         }
@@ -291,7 +278,7 @@ where
 }
 
 struct KeyRecorderUnitInfo<State: Eq + Copy + Debug + Hash> {
-    pair_hotkeys_map: HashMap<(BTreeSet<Key>, State), Action<State>>,
+    pair_hotkeys_map: HashMap<([Key; 2], State), Action<State>>,
     pair_input_keys: HashSet<(Key, State)>,
     single_hotkeys_map: HashMap<(KeyInput, State), Action<State>>,
     layer_name: &'static str,
@@ -312,18 +299,19 @@ impl KeyRecorder {
                 .iter()
                 .flat_map(|PairHotkeyEntry { cond, input, .. }| input.map(move |i| (i, *cond)))
                 .collect();
-            let pair_hotkeys_map: HashMap<(BTreeSet<Key>, State), Action<State>> = key_config
+            let pair_hotkeys_map: HashMap<([Key; 2], State), Action<State>> = key_config
                 .pair_hotkeys
                 .into_iter()
                 .map(
                     |PairHotkeyEntry {
                          cond,
-                         input,
+                         mut input,
                          output_keys,
                          transition,
                      }| {
+                        input.sort_unstable();
                         (
-                            (input.iter().copied().collect(), cond),
+                            (input, cond),
                             Action {
                                 output_keys,
                                 transition,
@@ -352,10 +340,6 @@ impl KeyRecorder {
                     },
                 )
                 .collect();
-            let mut pressing_pair: PressingPair<State> = PressingPair {
-                pair: Default::default(),
-                action: Default::default(),
-            };
             let mut recorder_state = KeyRecorderUnitState {
                 key_receiver,
                 state: initial_state,
@@ -377,14 +361,9 @@ impl KeyRecorder {
                             &mut recorder_state,
                         )
                     }
-                    KeyRecorderBehavior::SendKey((key, time)) => send_key_handler(
-                        key,
-                        time,
-                        &recorder_info,
-                        &mut pressing_pair,
-                        &mut recorder_state,
-                        &tx_clone,
-                    ),
+                    KeyRecorderBehavior::SendKey((key, time)) => {
+                        send_key_handler(key, time, &recorder_info, &mut recorder_state, &tx_clone)
+                    }
                 }
             }
         });
