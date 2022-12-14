@@ -347,7 +347,7 @@ fn mk_config() -> KeyConfigUnit<StateGeta> {
                 cond: c,
                 input: i,
                 output: vec![i],
-                transition: t,
+                transition: t.unwrap_or(c),
             })
         })
         .collect::<Vec<_>>();
@@ -363,7 +363,7 @@ fn mk_config() -> KeyConfigUnit<StateGeta> {
                         .iter()
                         .flat_map(|key| [KeyInput::press(*key), KeyInput::release(*key)])
                         .collect(),
-                    transition: *t,
+                    transition: t.unwrap_or(*c),
                 })
             })
             .chain(
@@ -374,7 +374,7 @@ fn mk_config() -> KeyConfigUnit<StateGeta> {
                             cond: *c,
                             input: *i,
                             output_keys: o.clone(),
-                            transition: *t,
+                            transition: t.unwrap_or(*c),
                         })
                     }),
             )
@@ -391,13 +391,13 @@ fn mk_config() -> KeyConfigUnit<StateGeta> {
                             .iter()
                             .flat_map(|key| [KeyInput::press(*key), KeyInput::release(*key)])
                             .collect::<Vec<_>>(),
-                        transition: *t,
+                        transition: t.unwrap_or(*c),
                     })
                     .chain(cs.iter().map(move |c| SingleHotkeyEntry {
                         cond: *c,
                         input: KeyInput::release(i[0]),
                         output: Vec::new(),
-                        transition: *t,
+                        transition: t.unwrap_or(*c),
                     }))
             })
             .chain(modifiers_trans)
@@ -460,7 +460,7 @@ fn config_caps_lock_arrow() -> KeyConfigUnit<StateCapsLock> {
             } else {
                 vec![KeyInput::press(o2), KeyInput::release(o2)]
             },
-            transition: None,
+            transition: c,
         });
     let single_hotkeys: &[(&[StateCapsLock], KeyInput, &[KeyInput], StateCapsLock)] = &[
         (&[Normal, CL], KeyInput::press(KEY_CAPSLOCK), &[], CL),
@@ -488,7 +488,7 @@ fn config_caps_lock_arrow() -> KeyConfigUnit<StateCapsLock> {
             cond: *c,
             input: *i,
             output: o.to_vec(),
-            transition: Some(*t),
+            transition: *t,
         })
     });
     KeyConfigUnit {
@@ -539,7 +539,7 @@ fn config_sands() -> KeyConfigUnit<StateSands> {
             cond: *c,
             input: *i,
             output: o.to_vec(),
-            transition: *t,
+            transition: t.unwrap_or(*c),
         })
     });
     let config2 = all_keys()
@@ -548,7 +548,7 @@ fn config_sands() -> KeyConfigUnit<StateSands> {
             cond: Space,
             input: KeyInput::press(k),
             output: vec![KeyInput::press(k)],
-            transition: Some(Shift),
+            transition: Shift,
         });
     KeyConfigUnit {
         pair_hotkeys: Vec::new(),
@@ -568,13 +568,13 @@ fn config_simple_remap() -> KeyConfigUnit<()> {
                 cond: (),
                 input: KeyInput::press(*i),
                 output: vec![KeyInput::press(*o)],
-                transition: None,
+                transition: (),
             })
             .chain(key_config_r.iter().map(|(i, o)| SingleHotkeyEntry {
                 cond: (),
                 input: KeyInput::release(*i),
                 output: vec![KeyInput::release(*o)],
-                transition: None,
+                transition: (),
             }))
             .collect(),
         layer_name: "simple remap",

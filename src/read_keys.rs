@@ -14,7 +14,7 @@ pub struct PairHotkeyEntry<State> {
     pub cond: State,
     pub input: [Key; 2],
     pub output_keys: Vec<KeyInput>,
-    pub transition: Option<State>,
+    pub transition: State,
 }
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
@@ -77,7 +77,7 @@ pub struct SingleHotkeyEntry<State> {
     pub cond: State,
     pub input: KeyInput,
     pub output: Vec<KeyInput>,
-    pub transition: Option<State>,
+    pub transition: State,
 }
 
 #[derive(PartialEq, Eq, Clone)]
@@ -146,7 +146,7 @@ pub struct KeyRecorder {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Action<State> {
     pub output_keys: Vec<KeyInput>,
-    pub transition: Option<State>,
+    pub transition: State,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -159,7 +159,7 @@ pub trait KeyReceiver: Send {
     fn send_key(&mut self, key: KeyInput, time: SystemTime);
 }
 
-fn perform_action<T, State>(
+fn perform_action<T, State: Eq>(
     action: &Action<State>,
     time: SystemTime,
     layer_name: &'static str,
@@ -171,14 +171,14 @@ fn perform_action<T, State>(
     for output_key in &action.output_keys {
         recorder_state.key_receiver.send_key(*output_key, time);
     }
-    if let Some(t) = action.transition {
+    if action.transition != recorder_state.state {
         log::debug!(
-            "[{}] state : {:?} -> {:?}",
+            "[{}] state : {:?} =====> {:?}",
             layer_name,
             recorder_state.state,
-            t
+            action.transition
         );
-        recorder_state.state = t;
+        recorder_state.state = action.transition;
     }
 }
 
