@@ -2,11 +2,12 @@ mod read_keys;
 mod write_keys;
 
 pub use crate::read_keys::{
-    AddLayer, EmptyConfig, KeyConfigUnit, KeyInput, PairHotkeyEntry, SingleHotkeyEntry,
+    AddLayer, KeyConfig, KeyConfigUnit, KeyInput, PairHotkeyEntry, SingleHotkeyEntry,
 };
 use crate::read_keys::{KeyReceiver, ToKeyRecorder};
-use evdev::{Device, InputEvent, InputEventKind, Key};
-use read_keys::KeyConfig;
+pub use evdev::Key;
+use evdev::{Device, InputEvent, InputEventKind};
+pub use evdev_keys;
 use std::{
     process::exit,
     sync::mpsc::{channel, Receiver},

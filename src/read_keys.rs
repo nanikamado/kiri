@@ -89,6 +89,17 @@ pub struct KeyConfigUnit<State> {
     pub initial_state: State,
 }
 
+impl Default for KeyConfigUnit<()> {
+    fn default() -> Self {
+        Self {
+            pair_hotkeys: Default::default(),
+            single_hotkeys: Default::default(),
+            layer_name: Default::default(),
+            initial_state: Default::default(),
+        }
+    }
+}
+
 impl<State: Debug> fmt::Debug for KeyConfigUnit<State> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "pair_hotkeys: ")?;
@@ -424,6 +435,7 @@ impl KeyReceiver for KeyWriter {
     }
 }
 
+#[derive(Debug)]
 pub struct KeyConfig<L> {
     pub(crate) layers: L,
     pub(crate) emergency_stop_key: Option<Key>,
@@ -476,6 +488,7 @@ impl<State: Eq + Copy + Debug + Hash + 'static> AddLayer for KeyConfigUnit<State
     }
 }
 
+#[derive(Debug, Default)]
 pub struct EmptyLayer;
 
 impl AddLayer for EmptyLayer {
@@ -486,15 +499,11 @@ impl AddLayer for EmptyLayer {
     }
 }
 
-pub struct EmptyConfig;
-
-impl AddLayer for EmptyConfig {
-    type LayerAdded<A> = KeyConfig<A>;
-
-    fn add_layer<T: AddLayer>(self, tail: T) -> Self::LayerAdded<T> {
-        KeyConfig {
-            layers: tail,
-            emergency_stop_key: None,
+impl Default for KeyConfig<EmptyLayer> {
+    fn default() -> Self {
+        Self {
+            layers: Default::default(),
+            emergency_stop_key: Default::default(),
         }
     }
 }
@@ -518,14 +527,5 @@ impl<A> KeyConfig<A> {
         }
         self.emergency_stop_key = Some(key);
         self
-    }
-}
-
-impl EmptyConfig {
-    pub fn emergency_stop_key(self, key: Key) -> KeyConfig<EmptyLayer> {
-        KeyConfig {
-            layers: EmptyLayer,
-            emergency_stop_key: Some(key),
-        }
     }
 }
