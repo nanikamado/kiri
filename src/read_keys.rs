@@ -424,25 +424,30 @@ impl KeyReceiver for KeyWriter {
     }
 }
 
+pub struct KeyConfig<L> {
+    pub(crate) layers: L,
+    pub(crate) emergency_stop_key: Option<Key>,
+}
+
 pub struct KeyConfigLayer<State: Eq + Copy + Debug + Hash + 'static, Tail>(
     KeyConfigUnit<State>,
     Tail,
 );
 
-pub trait KeyConfig {
-    fn to_key_recorder_unit(&self) -> KeyRecorder;
+pub trait ToKeyRecorder {
+    fn to_key_recorder(&self) -> KeyRecorder;
 }
 
-impl<State: Eq + Copy + Debug + Hash + Send + 'static, T: KeyConfig> KeyConfig
+impl<State: Eq + Copy + Debug + Hash + Send + 'static, T: ToKeyRecorder> ToKeyRecorder
     for KeyConfigLayer<State, T>
 {
-    fn to_key_recorder_unit(&self) -> KeyRecorder {
-        KeyRecorder::new(self.0.clone(), self.1.to_key_recorder_unit())
+    fn to_key_recorder(&self) -> KeyRecorder {
+        KeyRecorder::new(self.0.clone(), self.1.to_key_recorder())
     }
 }
 
-impl<State: Eq + Copy + Debug + Hash + Send + 'static> KeyConfig for KeyConfigUnit<State> {
-    fn to_key_recorder_unit(&self) -> KeyRecorder {
+impl<State: Eq + Copy + Debug + Hash + Send + 'static> ToKeyRecorder for KeyConfigUnit<State> {
+    fn to_key_recorder(&self) -> KeyRecorder {
         KeyRecorder::new(self.clone(), write_keys::KeyWriter::new())
     }
 }
@@ -471,12 +476,56 @@ impl<State: Eq + Copy + Debug + Hash + 'static> AddLayer for KeyConfigUnit<State
     }
 }
 
-pub struct EmptyCinfig;
+pub struct EmptyLayer;
 
-impl AddLayer for EmptyCinfig {
+impl AddLayer for EmptyLayer {
     type LayerAdded<A> = A;
 
     fn add_layer<T: AddLayer>(self, tail: T) -> Self::LayerAdded<T> {
         tail
+    }
+}
+
+pub struct EmptyConfig;
+
+impl AddLayer for EmptyConfig {
+    type LayerAdded<A> = KeyConfig<A>;
+
+    fn add_layer<T: AddLayer>(self, tail: T) -> Self::LayerAdded<T> {
+        KeyConfig {
+            layers: tail,
+            emergency_stop_key: None,
+        }
+    }
+}
+
+impl<A: AddLayer> AddLayer for KeyConfig<A> {
+    type LayerAdded<B> = KeyConfig<A::LayerAdded<B>>;
+
+    fn add_layer<T: AddLayer>(self, tail: T) -> Self::LayerAdded<T> {
+        KeyConfig {
+            layers: self.layers.add_layer(tail),
+            emergency_stop_key: self.emergency_stop_key,
+        }
+    }
+}
+
+impl<A> KeyConfig<A> {
+    pub fn emergency_stop_key(mut self, key: Key) -> Self {
+        if self.emergency_stop_key.is_some() {
+            eprintln!("multiple emergency stop key is not implemented");
+            std::process::exit(1);
+        }
+        self.emergency_stop_key = Some(key);
+        self
+    }
+}
+
+impl EmptyConfig {
+    pub fn emergency_stop_key(self, key: Key) -> KeyConfig<EmptyLayer> {
+        KeyConfig {
+            layers: EmptyLayer,
+            emergency_stop_key: Some(key),
+        }
     }
 }

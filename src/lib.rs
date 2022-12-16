@@ -2,10 +2,11 @@ mod read_keys;
 mod write_keys;
 
 pub use crate::read_keys::{
-    AddLayer, EmptyCinfig, KeyConfigUnit, KeyInput, PairHotkeyEntry, SingleHotkeyEntry,
+    AddLayer, EmptyConfig, KeyConfigUnit, KeyInput, PairHotkeyEntry, SingleHotkeyEntry,
 };
-use crate::read_keys::{KeyConfig, KeyReceiver};
+use crate::read_keys::{KeyReceiver, ToKeyRecorder};
 use evdev::{Device, InputEvent, InputEventKind, Key};
+use read_keys::KeyConfig;
 use std::{
     process::exit,
     sync::mpsc::{channel, Receiver},
@@ -44,18 +45,18 @@ pub trait KeyConfigRun {
     fn run(self);
 }
 
-impl<T: KeyConfig> KeyConfigRun for T {
+impl<T: ToKeyRecorder> KeyConfigRun for KeyConfig<T> {
     fn run(self) {
         let keyboards = get_keyboard_devices().collect::<Vec<_>>();
         if keyboards.is_empty() {
             eprintln!("keyboard not found");
             exit(1);
         }
-        let mut key_recorder = self.to_key_recorder_unit();
+        let mut key_recorder = self.layers.to_key_recorder();
         log::info!("config loaded");
         for input_event in make_read_channel(keyboards.into_iter()) {
             if let InputEventKind::Key(key) = input_event.kind() {
-                if input_event.value() == 1 && Key::KEY_CALC == key {
+                if input_event.value() == 1 && Some(key) == self.emergency_stop_key {
                     break;
                 }
                 let key = KeyInput(key, input_event.value().into());

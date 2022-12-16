@@ -2,7 +2,7 @@ use env_logger::Env;
 use evdev::Key;
 use evdev_keys::*;
 use kiri::{
-    AddLayer, EmptyCinfig, KeyConfigRun, KeyConfigUnit, KeyInput, PairHotkeyEntry,
+    AddLayer, EmptyConfig, KeyConfigRun, KeyConfigUnit, KeyInput, PairHotkeyEntry,
     SingleHotkeyEntry,
 };
 
@@ -588,10 +588,11 @@ fn config_simple_remap() -> KeyConfigUnit<()> {
 
 fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
-    EmptyCinfig
+    EmptyConfig
         .add_layer(config_simple_remap())
         .add_layer(config_caps_lock_arrow())
         .add_layer(config_sands())
         .add_layer(mk_config())
+        .emergency_stop_key(KEY_CALC)
         .run();
 }
