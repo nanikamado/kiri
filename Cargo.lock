@@ -54,7 +54,8 @@ dependencies = [
 [[package]]
 name = "evdev-keys"
 version = "0.2.0"
-source = "git+https://github.com/nanikamado/evdev-keys?rev=a67ea24#a67ea24d652c838efb7a04b9bcefa18275983dcb"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc856687846a395c7e14ef9ae6cd0c1dc67b5e0fb78a6ce375cbc5d30f00e002"
 dependencies = [
  "evdev",
 ]

@@ -8,5 +8,5 @@ edition = "2021"
 libc = "0.2.138"
 log = "0.4.17"
 evdev = "0.12.1"
-evdev-keys = { git = "https://github.com/nanikamado/evdev-keys", rev = "a67ea24" }
+evdev-keys = "0.2.0"
 rustc-hash = "1.1.0"
