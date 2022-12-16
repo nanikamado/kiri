@@ -13,6 +13,8 @@ enum StateGeta {
     JpInputWithModifires,
 }
 
+const THRESHOLD: u32 = 50;
+
 #[allow(clippy::type_complexity)]
 fn mk_config() -> KeyConfigUnit<StateGeta> {
     use StateGeta::*;
@@ -364,6 +366,7 @@ fn mk_config() -> KeyConfigUnit<StateGeta> {
                         .flat_map(|key| [KeyInput::press(*key), KeyInput::release(*key)])
                         .collect(),
                     transition: t.unwrap_or(*c),
+                    threshold: THRESHOLD,
                 })
             })
             .chain(
@@ -375,6 +378,7 @@ fn mk_config() -> KeyConfigUnit<StateGeta> {
                             input: *i,
                             output_keys: o.clone(),
                             transition: t.unwrap_or(*c),
+                            threshold: THRESHOLD,
                         })
                     }),
             )
