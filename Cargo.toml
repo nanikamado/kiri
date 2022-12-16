@@ -3,6 +3,9 @@ name = "kiri"
 version = "0.1.0"
 authors = ["nanikamado <nanikamado@gmail.com>"]
 edition = "2021"
+description = "A key remapper."
+repository = "https://github.com/nanikamado/kiri"
+license = "Unlicense OR Apache-2.0"
 
 [dependencies]
 libc = "0.2.138"
