@@ -1,7 +1,9 @@
 mod read_keys;
 mod write_keys;
 
-pub use crate::read_keys::{AddLayer, KeyConfig, KeyInput, PairHotkey, RemapLayer, SingleHotkey};
+pub use crate::read_keys::{
+    AddLayer, KeyConfig, KeyInput, PairRemapEntry, RemapLayer, SingleRemapEntry,
+};
 use crate::read_keys::{KeyReceiver, ToKeyRecorder};
 pub use evdev::Key;
 use evdev::{Device, InputEvent, InputEventKind};

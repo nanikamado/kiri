@@ -12,11 +12,15 @@ use std::{
 };
 
 #[derive(PartialEq, Eq, Hash, Clone)]
-pub struct PairHotkey<State> {
-    pub cond: State,
+pub struct PairRemapEntry<State> {
+    /// Condition of remapping
+    pub condition: State,
     pub input: [KeyInput; 2],
-    pub output_keys: Vec<KeyInput>,
+    /// Key sequence to be output
+    pub output: Vec<KeyInput>,
+    /// Next state
     pub transition: State,
+    /// Threshold to judge simultaneous input. milli sec.
     pub threshold: u32,
 }
 
@@ -75,17 +79,20 @@ impl From<i32> for KeyInputKind {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
-pub struct SingleHotkey<State> {
-    pub cond: State,
+pub struct SingleRemapEntry<State> {
+    /// Condition of remapping
+    pub condition: State,
     pub input: KeyInput,
+    /// Key sequence to be output
     pub output: Vec<KeyInput>,
+    /// Next state
     pub transition: State,
 }
 
 #[derive(PartialEq, Eq, Clone)]
 pub struct RemapLayer<State> {
-    pub pair_hotkeys: Vec<PairHotkey<State>>,
-    pub single_hotkeys: Vec<SingleHotkey<State>>,
+    pub pair_remap_entries: Vec<PairRemapEntry<State>>,
+    pub single_remap_entries: Vec<SingleRemapEntry<State>>,
     pub layer_name: &'static str,
     pub initial_state: State,
 }
@@ -93,8 +100,8 @@ pub struct RemapLayer<State> {
 impl Default for RemapLayer<()> {
     fn default() -> Self {
         Self {
-            pair_hotkeys: Default::default(),
-            single_hotkeys: Default::default(),
+            pair_remap_entries: Default::default(),
+            single_remap_entries: Default::default(),
             layer_name: Default::default(),
             initial_state: Default::default(),
         }
@@ -103,34 +110,34 @@ impl Default for RemapLayer<()> {
 
 impl<State: Debug> fmt::Debug for RemapLayer<State> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "pair_hotkeys: ")?;
-        for e in &self.pair_hotkeys {
+        writeln!(f, "pair_remap_entries: ")?;
+        for e in &self.pair_remap_entries {
             writeln!(f, "    {:?}", e)?;
         }
-        write!(f, "single_hotkeys: ")?;
-        for e in &self.single_hotkeys {
+        write!(f, "single_remap_entries: ")?;
+        for e in &self.single_remap_entries {
             write!(f, "\n    {:?}", e)?;
         }
         Ok(())
     }
 }
 
-impl<State: Debug> fmt::Debug for PairHotkey<State> {
+impl<State: Debug> fmt::Debug for PairRemapEntry<State> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{:?}, {:?}, {:?}, {:?}",
-            self.cond, self.input, self.output_keys, self.transition
+            self.condition, self.input, self.output, self.transition
         )
     }
 }
 
-impl<State: Debug> fmt::Debug for SingleHotkey<State> {
+impl<State: Debug> fmt::Debug for SingleRemapEntry<State> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{:?}, {:?}, {:?}, {:?}",
-            self.cond, self.input, self.output, self.transition,
+            self.condition, self.input, self.output, self.transition,
         )
     }
 }
@@ -322,7 +329,7 @@ impl KeyRecorder {
         let layer_name = key_config.layer_name;
         let initial_state = key_config.initial_state;
         let threshold = key_config
-            .pair_hotkeys
+            .pair_remap_entries
             .iter()
             .map(|p| p.threshold)
             .max()
@@ -330,18 +337,24 @@ impl KeyRecorder {
         log::debug!("threshold of {} = {}", key_config.layer_name, threshold);
         thread::spawn(move || {
             let pair_input_keys: HashSet<(KeyInput, State)> = key_config
-                .pair_hotkeys
+                .pair_remap_entries
                 .iter()
-                .flat_map(|PairHotkey { cond, input, .. }| input.map(move |i| (i, *cond)))
+                .flat_map(
+                    |PairRemapEntry {
+                         condition: cond,
+                         input,
+                         ..
+                     }| input.map(move |i| (i, *cond)),
+                )
                 .collect();
             let pair_hotkeys_map: HashMap<([KeyInput; 2], State), PairAction<State>> = key_config
-                .pair_hotkeys
+                .pair_remap_entries
                 .into_iter()
                 .map(
-                    |PairHotkey {
-                         cond,
+                    |PairRemapEntry {
+                         condition: cond,
                          mut input,
-                         output_keys,
+                         output: output_keys,
                          transition,
                          threshold,
                      }| {
@@ -360,11 +373,11 @@ impl KeyRecorder {
                 )
                 .collect();
             let single_hotkeys_map: HashMap<(KeyInput, State), Action<State>> = key_config
-                .single_hotkeys
+                .single_remap_entries
                 .into_iter()
                 .map(
-                    |SingleHotkey {
-                         cond,
+                    |SingleRemapEntry {
+                         condition: cond,
                          input,
                          output,
                          transition,
