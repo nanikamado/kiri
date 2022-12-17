@@ -221,7 +221,6 @@ fn fire_specific_waiting_key_handler<T, State: Eq + Copy + Debug + Hash>(
     if Some((key, time)) == recorder_state.waiting_key {
         recorder_state.waiting_key = None;
         fire_key_input(KeyInput::press(key), time, recorder_info, recorder_state);
-        fire_key_input(KeyInput::release(key), time, recorder_info, recorder_state);
     }
 }
 
@@ -234,7 +233,6 @@ fn fire_waiting_key<T, State: Eq + Copy + Debug + Hash>(
     if let Some((key, time)) = recorder_state.waiting_key {
         recorder_state.waiting_key = None;
         fire_key_input(KeyInput::press(key), time, recorder_info, recorder_state);
-        fire_key_input(KeyInput::release(key), time, recorder_info, recorder_state);
     }
 }
 
@@ -285,10 +283,6 @@ fn send_key_handler<'a, T, State: Eq + Copy + Debug + Hash>(
                 }
             }
         }
-        KeyInput(key_name, KeyInputKind::Release)
-            if recorder_info
-                .pair_input_keys
-                .contains(&(key_name, recorder_state.state)) => {}
         _ => {
             fire_waiting_key(recorder_info, recorder_state);
             fire_key_input(key, time, recorder_info, recorder_state);
