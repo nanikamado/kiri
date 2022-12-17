@@ -11,7 +11,7 @@ use std::{
 };
 
 #[derive(PartialEq, Eq, Hash, Clone)]
-pub struct PairHotkeyEntry<State> {
+pub struct PairHotkey<State> {
     pub cond: State,
     pub input: [KeyInput; 2],
     pub output_keys: Vec<KeyInput>,
@@ -74,7 +74,7 @@ impl From<i32> for KeyInputKind {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
-pub struct SingleHotkeyEntry<State> {
+pub struct SingleHotkey<State> {
     pub cond: State,
     pub input: KeyInput,
     pub output: Vec<KeyInput>,
@@ -82,14 +82,14 @@ pub struct SingleHotkeyEntry<State> {
 }
 
 #[derive(PartialEq, Eq, Clone)]
-pub struct KeyConfigUnit<State> {
-    pub pair_hotkeys: Vec<PairHotkeyEntry<State>>,
-    pub single_hotkeys: Vec<SingleHotkeyEntry<State>>,
+pub struct RemapLayer<State> {
+    pub pair_hotkeys: Vec<PairHotkey<State>>,
+    pub single_hotkeys: Vec<SingleHotkey<State>>,
     pub layer_name: &'static str,
     pub initial_state: State,
 }
 
-impl Default for KeyConfigUnit<()> {
+impl Default for RemapLayer<()> {
     fn default() -> Self {
         Self {
             pair_hotkeys: Default::default(),
@@ -100,7 +100,7 @@ impl Default for KeyConfigUnit<()> {
     }
 }
 
-impl<State: Debug> fmt::Debug for KeyConfigUnit<State> {
+impl<State: Debug> fmt::Debug for RemapLayer<State> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "pair_hotkeys: ")?;
         for e in &self.pair_hotkeys {
@@ -114,7 +114,7 @@ impl<State: Debug> fmt::Debug for KeyConfigUnit<State> {
     }
 }
 
-impl<State: Debug> fmt::Debug for PairHotkeyEntry<State> {
+impl<State: Debug> fmt::Debug for PairHotkey<State> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -124,7 +124,7 @@ impl<State: Debug> fmt::Debug for PairHotkeyEntry<State> {
     }
 }
 
-impl<State: Debug> fmt::Debug for SingleHotkeyEntry<State> {
+impl<State: Debug> fmt::Debug for SingleHotkey<State> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -313,7 +313,7 @@ struct KeyRecorderUnitInfo<State: Eq + Copy + Debug + Hash> {
 
 impl KeyRecorder {
     fn new<State: Eq + Copy + Debug + Hash + Send + 'static>(
-        key_config: KeyConfigUnit<State>,
+        key_config: RemapLayer<State>,
         key_receiver: impl KeyReceiver + 'static,
     ) -> KeyRecorder {
         let (tx, rx) = channel();
@@ -331,13 +331,13 @@ impl KeyRecorder {
             let pair_input_keys: HashSet<(KeyInput, State)> = key_config
                 .pair_hotkeys
                 .iter()
-                .flat_map(|PairHotkeyEntry { cond, input, .. }| input.map(move |i| (i, *cond)))
+                .flat_map(|PairHotkey { cond, input, .. }| input.map(move |i| (i, *cond)))
                 .collect();
             let pair_hotkeys_map: HashMap<([KeyInput; 2], State), PairAction<State>> = key_config
                 .pair_hotkeys
                 .into_iter()
                 .map(
-                    |PairHotkeyEntry {
+                    |PairHotkey {
                          cond,
                          mut input,
                          output_keys,
@@ -362,7 +362,7 @@ impl KeyRecorder {
                 .single_hotkeys
                 .into_iter()
                 .map(
-                    |SingleHotkeyEntry {
+                    |SingleHotkey {
                          cond,
                          input,
                          output,
@@ -435,24 +435,21 @@ pub struct KeyConfig<L> {
     pub(crate) emergency_stop_key: Option<Key>,
 }
 
-pub struct KeyConfigLayer<State: Eq + Copy + Debug + Hash + 'static, Tail>(
-    KeyConfigUnit<State>,
-    Tail,
-);
+pub struct RemapLayers<State: Eq + Copy + Debug + Hash + 'static, Tail>(RemapLayer<State>, Tail);
 
 pub trait ToKeyRecorder {
     fn to_key_recorder(&self) -> KeyRecorder;
 }
 
 impl<State: Eq + Copy + Debug + Hash + Send + 'static, T: ToKeyRecorder> ToKeyRecorder
-    for KeyConfigLayer<State, T>
+    for RemapLayers<State, T>
 {
     fn to_key_recorder(&self) -> KeyRecorder {
         KeyRecorder::new(self.0.clone(), self.1.to_key_recorder())
     }
 }
 
-impl<State: Eq + Copy + Debug + Hash + Send + 'static> ToKeyRecorder for KeyConfigUnit<State> {
+impl<State: Eq + Copy + Debug + Hash + Send + 'static> ToKeyRecorder for RemapLayer<State> {
     fn to_key_recorder(&self) -> KeyRecorder {
         KeyRecorder::new(self.clone(), write_keys::KeyWriter::new())
     }
@@ -465,20 +462,20 @@ pub trait AddLayer {
 }
 
 impl<State: Eq + Copy + Debug + Hash + 'static, Tail: AddLayer> AddLayer
-    for KeyConfigLayer<State, Tail>
+    for RemapLayers<State, Tail>
 {
-    type LayerAdded<A> = KeyConfigLayer<State, Tail::LayerAdded<A>>;
+    type LayerAdded<A> = RemapLayers<State, Tail::LayerAdded<A>>;
 
     fn add_layer<T: AddLayer>(self, tail: T) -> Self::LayerAdded<T> {
-        KeyConfigLayer(self.0, self.1.add_layer(tail))
+        RemapLayers(self.0, self.1.add_layer(tail))
     }
 }
 
-impl<State: Eq + Copy + Debug + Hash + 'static> AddLayer for KeyConfigUnit<State> {
-    type LayerAdded<A> = KeyConfigLayer<State, A>;
+impl<State: Eq + Copy + Debug + Hash + 'static> AddLayer for RemapLayer<State> {
+    type LayerAdded<A> = RemapLayers<State, A>;
 
     fn add_layer<T: AddLayer>(self, tail: T) -> Self::LayerAdded<T> {
-        KeyConfigLayer(self, tail)
+        RemapLayers(self, tail)
     }
 }
 
