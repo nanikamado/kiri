@@ -35,7 +35,7 @@ impl From<KeyInputKind> for i32 {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
-pub struct KeyInput(pub Key, pub KeyInputKind);
+pub struct KeyInput(pub(crate) Key, pub(crate) KeyInputKind);
 
 impl KeyInput {
     pub fn press(key: Key) -> KeyInput {
