@@ -30,9 +30,25 @@ fn make_read_channel(devices: impl Iterator<Item = Device>) -> Receiver<InputEve
     let (tx, rx) = channel();
     for mut d in devices {
         let tx = tx.clone();
-        d.grab().unwrap();
+        if let Err(e) = d.grab() {
+            match e.raw_os_error() {
+                Some(16) => {
+                    log::error!(
+                        "Could not grab \"{}\". {e}. \
+                        Maybe there is another key remapper running.",
+                        d.name().unwrap_or("unknown"),
+                    )
+                }
+                _ => {
+                    log::error!("Could not grab \"{}\". {e}.", d.name().unwrap_or("unknown"),);
+                }
+            }
+        } else {
+            log::info!("Successfully grabed \"{}\".", d.name().unwrap_or("unknown"))
+        }
+
         thread::spawn(move || loop {
-            for input_event in d.fetch_events().expect("cannot read device") {
+            for input_event in d.fetch_events().expect("Cannot read device") {
                 tx.send(input_event).unwrap();
             }
         });
@@ -48,18 +64,36 @@ impl<T: ToKeyRecorder> KeyConfigRun for KeyConfig<T> {
     fn run(self) {
         let keyboards = get_keyboard_devices().collect::<Vec<_>>();
         if keyboards.is_empty() {
-            eprintln!("keyboard not found");
+            eprintln!("Keyboard not found");
             exit(1);
         }
-        let mut key_recorder = self.layers.to_key_recorder();
-        log::info!("config loaded");
-        for input_event in make_read_channel(keyboards.into_iter()) {
-            if let InputEventKind::Key(key) = input_event.kind() {
-                if input_event.value() == 1 && Some(key) == self.emergency_stop_key {
-                    break;
+        match self.layers.to_key_recorder() {
+            Err(e) => {
+                match e.kind() {
+                    std::io::ErrorKind::PermissionDenied => {
+                        eprintln!("{e}");
+                        eprintln!(
+                            "Kiri has to be run with superuser privileges. \
+                            Retry with sudo."
+                        );
+                    }
+                    _ => {
+                        eprintln!("{e}");
+                    }
+                };
+                exit(1)
+            }
+            Ok(mut key_recorder) => {
+                log::info!("Config loaded");
+                for input_event in make_read_channel(keyboards.into_iter()) {
+                    if let InputEventKind::Key(key) = input_event.kind() {
+                        if input_event.value() == 1 && Some(key) == self.emergency_stop_key {
+                            break;
+                        }
+                        let key = KeyInput(key, input_event.value().into());
+                        key_recorder.send_key(key, input_event.timestamp());
+                    }
                 }
-                let key = KeyInput(key, input_event.value().into());
-                key_recorder.send_key(key, input_event.timestamp());
             }
         }
     }

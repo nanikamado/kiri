@@ -4,6 +4,7 @@ use rustc_hash::FxHashMap as HashMap;
 use rustc_hash::FxHashSet as HashSet;
 use std::fmt::{self, Debug};
 use std::hash::Hash;
+use std::io;
 use std::time::SystemTime;
 use std::{
     sync::mpsc::{channel, Sender},
@@ -438,20 +439,23 @@ pub struct KeyConfig<L> {
 pub struct RemapLayers<State: Eq + Copy + Debug + Hash + 'static, Tail>(RemapLayer<State>, Tail);
 
 pub trait ToKeyRecorder {
-    fn to_key_recorder(&self) -> KeyRecorder;
+    fn to_key_recorder(&self) -> Result<KeyRecorder, io::Error>;
 }
 
 impl<State: Eq + Copy + Debug + Hash + Send + 'static, T: ToKeyRecorder> ToKeyRecorder
     for RemapLayers<State, T>
 {
-    fn to_key_recorder(&self) -> KeyRecorder {
-        KeyRecorder::new(self.0.clone(), self.1.to_key_recorder())
+    fn to_key_recorder(&self) -> Result<KeyRecorder, io::Error> {
+        Ok(KeyRecorder::new(self.0.clone(), self.1.to_key_recorder()?))
     }
 }
 
 impl<State: Eq + Copy + Debug + Hash + Send + 'static> ToKeyRecorder for RemapLayer<State> {
-    fn to_key_recorder(&self) -> KeyRecorder {
-        KeyRecorder::new(self.clone(), write_keys::KeyWriter::new())
+    fn to_key_recorder(&self) -> Result<KeyRecorder, io::Error> {
+        Ok(KeyRecorder::new(
+            self.clone(),
+            write_keys::KeyWriter::new()?,
+        ))
     }
 }
 
