@@ -13,13 +13,13 @@ use std::{
 #[derive(PartialEq, Eq, Hash, Clone)]
 pub struct PairHotkeyEntry<State> {
     pub cond: State,
-    pub input: [Key; 2],
+    pub input: [KeyInput; 2],
     pub output_keys: Vec<KeyInput>,
     pub transition: State,
     pub threshold: u32,
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone, Copy, PartialOrd, Ord)]
 pub enum KeyInputKind {
     Press,
     Release,
@@ -34,7 +34,7 @@ impl From<KeyInputKind> for i32 {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
 pub struct KeyInput(pub Key, pub KeyInputKind);
 
 impl KeyInput {
@@ -134,7 +134,7 @@ impl<State: Debug> fmt::Debug for SingleHotkeyEntry<State> {
     }
 }
 
-type KeyEv = (Key, SystemTime);
+type KeyEv = (KeyInput, SystemTime);
 
 #[derive(Debug)]
 enum KeyRecorderBehavior {
@@ -143,7 +143,7 @@ enum KeyRecorderBehavior {
 }
 
 fn fire_waiting_key_with_delay(
-    key: (Key, SystemTime),
+    key: (KeyInput, SystemTime),
     tx: Sender<KeyRecorderBehavior>,
     threshold: u64,
 ) {
@@ -211,7 +211,7 @@ fn fire_key_input<T, State: Eq + Copy + Debug + Hash>(
 }
 
 fn fire_specific_waiting_key_handler<T, State: Eq + Copy + Debug + Hash>(
-    key: Key,
+    key: KeyInput,
     time: SystemTime,
     recorder_info: &KeyRecorderUnitInfo<State>,
     recorder_state: &mut KeyRecorderUnitState<T, State>,
@@ -220,7 +220,7 @@ fn fire_specific_waiting_key_handler<T, State: Eq + Copy + Debug + Hash>(
 {
     if Some((key, time)) == recorder_state.waiting_key {
         recorder_state.waiting_key = None;
-        fire_key_input(KeyInput::press(key), time, recorder_info, recorder_state);
+        fire_key_input(key, time, recorder_info, recorder_state);
     }
 }
 
@@ -232,7 +232,7 @@ fn fire_waiting_key<T, State: Eq + Copy + Debug + Hash>(
 {
     if let Some((key, time)) = recorder_state.waiting_key {
         recorder_state.waiting_key = None;
-        fire_key_input(KeyInput::press(key), time, recorder_info, recorder_state);
+        fire_key_input(key, time, recorder_info, recorder_state);
     }
 }
 
@@ -247,7 +247,7 @@ fn send_key_handler<'a, T, State: Eq + Copy + Debug + Hash>(
     T: KeyReceiver,
 {
     match key {
-        KeyInput(key_name, KeyInputKind::Press)
+        key_name
             if recorder_info
                 .pair_input_keys
                 .contains(&(key_name, recorder_state.state)) =>
@@ -296,7 +296,7 @@ where
 {
     key_receiver: T,
     state: State,
-    waiting_key: Option<(Key, SystemTime)>,
+    waiting_key: Option<(KeyInput, SystemTime)>,
 }
 
 struct PairAction<State> {
@@ -305,8 +305,8 @@ struct PairAction<State> {
 }
 
 struct KeyRecorderUnitInfo<State: Eq + Copy + Debug + Hash> {
-    pair_hotkeys_map: HashMap<([Key; 2], State), PairAction<State>>,
-    pair_input_keys: HashSet<(Key, State)>,
+    pair_hotkeys_map: HashMap<([KeyInput; 2], State), PairAction<State>>,
+    pair_input_keys: HashSet<(KeyInput, State)>,
     single_hotkeys_map: HashMap<(KeyInput, State), Action<State>>,
     layer_name: &'static str,
 }
@@ -328,12 +328,12 @@ impl KeyRecorder {
             .unwrap_or(0);
         log::debug!("threshold of {} = {}", key_config.layer_name, threshold);
         thread::spawn(move || {
-            let pair_input_keys: HashSet<(Key, State)> = key_config
+            let pair_input_keys: HashSet<(KeyInput, State)> = key_config
                 .pair_hotkeys
                 .iter()
                 .flat_map(|PairHotkeyEntry { cond, input, .. }| input.map(move |i| (i, *cond)))
                 .collect();
-            let pair_hotkeys_map: HashMap<([Key; 2], State), PairAction<State>> = key_config
+            let pair_hotkeys_map: HashMap<([KeyInput; 2], State), PairAction<State>> = key_config
                 .pair_hotkeys
                 .into_iter()
                 .map(
