@@ -1,15 +1,11 @@
 use crate::write_keys::{self, KeyWriter};
 use evdev::Key;
-use rustc_hash::FxHashMap as HashMap;
-use rustc_hash::FxHashSet as HashSet;
+use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::fmt::{self, Debug};
 use std::hash::Hash;
-use std::io;
+use std::sync::mpsc::{channel, Sender};
 use std::time::SystemTime;
-use std::{
-    sync::mpsc::{channel, Sender},
-    thread, time,
-};
+use std::{io, thread, time};
 
 #[derive(PartialEq, Eq, Hash, Clone)]
 pub struct PairRemapEntry<State> {

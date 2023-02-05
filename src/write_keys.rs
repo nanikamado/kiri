@@ -1,8 +1,6 @@
 use crate::read_keys::KeyInput;
-use evdev::{
-    uinput::{VirtualDevice, VirtualDeviceBuilder},
-    EventType, InputEvent,
-};
+use evdev::uinput::{VirtualDevice, VirtualDeviceBuilder};
+use evdev::{EventType, InputEvent};
 use std::io;
 
 pub struct KeyWriter {

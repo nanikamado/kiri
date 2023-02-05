@@ -8,11 +8,9 @@ use crate::read_keys::{KeyReceiver, ToKeyRecorder};
 pub use evdev::Key;
 use evdev::{Device, InputEvent, InputEventKind};
 pub use evdev_keys;
-use std::{
-    process::exit,
-    sync::mpsc::{channel, Receiver},
-    thread,
-};
+use std::process::exit;
+use std::sync::mpsc::{channel, Receiver};
+use std::thread;
 
 fn get_keyboard_devices() -> impl Iterator<Item = Device> {
     evdev::enumerate().filter_map(|(_, device)| {
